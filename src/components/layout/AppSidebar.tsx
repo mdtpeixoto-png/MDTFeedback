@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Phone, AlertTriangle, Settings,
-  LogOut, BarChart3, Notebook, Trophy, Shield
+  LogOut, BarChart3, Notebook, Trophy, Shield, Cog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { User } from "@/lib/mockData";
@@ -18,18 +18,21 @@ const roleMenus: Record<string, { label: string; path: string; icon: ReactNode }
     { label: "Usuários", path: "/dev/users", icon: <Users className="h-4 w-4" /> },
     { label: "Métricas IA", path: "/dev/ai-metrics", icon: <BarChart3 className="h-4 w-4" /> },
     { label: "Riscos", path: "/dev/risks", icon: <AlertTriangle className="h-4 w-4" /> },
+    { label: "Configurações", path: "/dev/settings", icon: <Cog className="h-4 w-4" /> },
   ],
   admin: [
     { label: "Dashboard", path: "/admin", icon: <LayoutDashboard className="h-4 w-4" /> },
     { label: "Vendedores", path: "/admin/sellers", icon: <Users className="h-4 w-4" /> },
     { label: "Ligações", path: "/admin/calls", icon: <Phone className="h-4 w-4" /> },
     { label: "Alertas", path: "/admin/alerts", icon: <AlertTriangle className="h-4 w-4" /> },
+    { label: "Configurações", path: "/admin/settings", icon: <Cog className="h-4 w-4" /> },
   ],
   seller: [
     { label: "Meu Painel", path: "/seller", icon: <LayoutDashboard className="h-4 w-4" /> },
     { label: "Feedbacks", path: "/seller/feedbacks", icon: <Phone className="h-4 w-4" /> },
     { label: "Ranking", path: "/seller/ranking", icon: <Trophy className="h-4 w-4" /> },
     { label: "Anotações", path: "/seller/notes", icon: <Notebook className="h-4 w-4" /> },
+    { label: "Configurações", path: "/seller/settings", icon: <Cog className="h-4 w-4" /> },
   ],
 };
 
