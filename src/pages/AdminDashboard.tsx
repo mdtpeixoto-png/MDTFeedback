@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import MetricCard from "@/components/dashboard/MetricCard";
 import { SalesLineChart, ProductPieChart } from "@/components/dashboard/Charts";
@@ -46,6 +46,7 @@ function AdminHome() {
 }
 
 function AdminSellers() {
+  const navigate = useNavigate();
   const sellers = mockUsers.filter(u => u.role === 'seller');
 
   return (
@@ -71,7 +72,7 @@ function AdminSellers() {
               const fbCount = mockFeedbacks.filter(f => f.sellerId === s.id).length;
               const idle = mockIdleLogs.find(l => l.sellerId === s.id);
               return (
-                <tr key={s.id} className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/sellers/${s.id}`}>
+                <tr key={s.id} className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => navigate(`/admin/sellers/${s.id}`)}>
                   <td className="px-5 py-3 text-sm font-medium">
                     <Link to={`/admin/sellers/${s.id}`} className="text-primary hover:underline">{s.name}</Link>
                   </td>
