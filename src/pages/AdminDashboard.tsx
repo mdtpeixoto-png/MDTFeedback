@@ -71,7 +71,7 @@ function AdminSellers() {
               const fbCount = mockFeedbacks.filter(f => f.sellerId === s.id).length;
               const idle = mockIdleLogs.find(l => l.sellerId === s.id);
               return (
-                <tr key={s.id} className="hover:bg-secondary/30 transition-colors">
+                <tr key={s.id} className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => window.location.href = `/admin/sellers/${s.id}`}>
                   <td className="px-5 py-3 text-sm font-medium">
                     <Link to={`/admin/sellers/${s.id}`} className="text-primary hover:underline">{s.name}</Link>
                   </td>
