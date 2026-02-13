@@ -45,7 +45,7 @@ export default function AppSidebar({ user, onLogout }: SidebarProps) {
   const badge = roleBadge[user.role];
 
   return (
-    <aside className="flex flex-col w-64 min-h-screen bg-sidebar border-r border-sidebar-border">
+    <aside className="flex flex-col w-64 h-screen bg-sidebar border-r border-sidebar-border sticky top-0 shrink-0">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
         <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary">
