@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Routes, Route } from "react-router-dom";
+import SettingsPage from "@/pages/SettingsPage";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import MetricCard from "@/components/dashboard/MetricCard";
 import NotebookSystem from "@/components/seller/NotebookSystem";
@@ -222,6 +223,11 @@ export default function SellerDashboard({ user, onLogout }: SellerDashboardProps
       <Route path="notes" element={
         <DashboardLayout user={user} onLogout={onLogout} title="Anotações" subtitle="Seus cadernos de anotações">
           <NotebookSystem />
+        </DashboardLayout>
+      } />
+      <Route path="settings" element={
+        <DashboardLayout user={user} onLogout={onLogout} title="Configurações" subtitle="Preferências do sistema">
+          <SettingsPage />
         </DashboardLayout>
       } />
     </Routes>

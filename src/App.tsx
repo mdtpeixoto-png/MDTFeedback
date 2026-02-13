@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { User } from "@/lib/mockData";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import LoginPage from "./pages/LoginPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import SellerDashboard from "./pages/SellerDashboard";
@@ -19,11 +20,12 @@ const App = () => {
   const handleLogout = () => setUser(null);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
           <Routes>
             <Route path="/" element={user ? <Navigate to={user.role === 'developer' ? '/dev' : user.role === 'admin' ? '/admin' : '/seller'} /> : <LoginPage onLogin={setUser} />} />
             <Route path="/admin/*" element={user?.role === 'admin' ? <AdminDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
@@ -31,9 +33,10 @@ const App = () => {
             <Route path="/dev/*" element={user?.role === 'developer' ? <DevDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </QueryClientProvider>
+          </BrowserRouter>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 

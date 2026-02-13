@@ -9,6 +9,7 @@ import {
 } from "@/lib/mockData";
 import { Database, Users, AlertTriangle, Cpu, ShoppingCart, Bug, BarChart3, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
+import SettingsPage from "@/pages/SettingsPage";
 
 interface DevDashboardProps {
   user: User;
@@ -188,6 +189,11 @@ export default function DevDashboard({ user, onLogout }: DevDashboardProps) {
       <Route path="risks" element={
         <DashboardLayout user={user} onLogout={onLogout} title="Riscos" subtitle="Riscos operacionais detectados">
           <DevRisks />
+        </DashboardLayout>
+      } />
+      <Route path="settings" element={
+        <DashboardLayout user={user} onLogout={onLogout} title="Configurações" subtitle="Preferências do sistema">
+          <SettingsPage />
         </DashboardLayout>
       } />
     </Routes>

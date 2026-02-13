@@ -5,6 +5,7 @@ import { SalesLineChart, ProductPieChart } from "@/components/dashboard/Charts";
 import RankingTable from "@/components/dashboard/RankingTable";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import AdminSellerDetail from "@/components/admin/AdminSellerDetail";
+import SettingsPage from "@/pages/SettingsPage";
 import {
   User, mockSales, mockIdleLogs, mockUsers, mockFeedbacks,
   getSellerRanking, getSalesByProduct, getSalesByWeekAndPeriod,
@@ -168,6 +169,11 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       <Route path="alerts" element={
         <DashboardLayout user={user} onLogout={onLogout} title="Alertas" subtitle="Riscos operacionais">
           <AdminAlerts />
+        </DashboardLayout>
+      } />
+      <Route path="settings" element={
+        <DashboardLayout user={user} onLogout={onLogout} title="Configurações" subtitle="Preferências do sistema">
+          <SettingsPage />
         </DashboardLayout>
       } />
     </Routes>
