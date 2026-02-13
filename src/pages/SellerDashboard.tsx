@@ -124,8 +124,9 @@ function SellerFeedbacks({ user }: { user: User }) {
 }
 
 function SellerRanking({ user }: { user: User }) {
+  const ranking = getSellerRanking();
   const position = getSellerPosition(user.id);
-  const totalSellers = getSellerRanking().length;
+  const totalSellers = ranking.length;
 
   // Mock position evolution
   const positionHistory = [
@@ -142,6 +143,41 @@ function SellerRanking({ user }: { user: User }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <MetricCard label="Posição Atual" value={`${position}º`} icon={<Trophy className="h-5 w-5" />} />
         <MetricCard label="Total de Vendedores" value={totalSellers} icon={<TrendingUp className="h-5 w-5" />} />
+      </div>
+
+      <div className="glass-card overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-border">
+          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-warning" />
+            Ranking Geral
+          </h3>
+        </div>
+        <div className="divide-y divide-border">
+          {ranking.map((seller, index) => (
+            <div
+              key={seller.id}
+              className={cn(
+                "flex items-center gap-4 px-5 py-3 transition-colors",
+                seller.id === user.id && "bg-primary/5 border-l-2 border-l-primary"
+              )}
+            >
+              <span className={cn(
+                "flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold",
+                index === 0 ? "bg-warning/20 text-warning" :
+                index === 1 ? "bg-muted text-muted-foreground" :
+                index === 2 ? "bg-warning/10 text-warning/70" :
+                "bg-secondary text-secondary-foreground"
+              )}>
+                {index + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {seller.id === user.id ? `${seller.name} (Você)` : seller.name}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="glass-card p-5">
