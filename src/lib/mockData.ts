@@ -15,6 +15,7 @@ export interface Sale {
   date: string;
   period: 'morning' | 'afternoon' | 'evening';
   value: number;
+  week: number;
 }
 
 export interface CallFeedback {
@@ -60,17 +61,25 @@ function randomDate(daysBack: number): string {
   return d.toISOString().split('T')[0];
 }
 
+function getWeekOfMonth(dateStr: string): number {
+  const d = new Date(dateStr);
+  const day = d.getDate();
+  return Math.min(Math.ceil(day / 7), 4);
+}
+
 export const mockSales: Sale[] = Array.from({ length: 120 }, (_, i) => {
   const seller = mockUsers.filter(u => u.role === 'seller')[Math.floor(Math.random() * 6)];
+  const date = randomDate(60);
   return {
     id: `s${i}`,
     sellerId: seller.id,
     sellerName: seller.name,
     product: products[Math.floor(Math.random() * 3)],
     plan: plans[Math.floor(Math.random() * 5)],
-    date: randomDate(60),
+    date,
     period: periods[Math.floor(Math.random() * 3)],
     value: Math.floor(Math.random() * 200) + 50,
+    week: getWeekOfMonth(date),
   };
 });
 
@@ -155,4 +164,46 @@ export function getSalesByMonth() {
 export function getSellerPosition(sellerId: string): number {
   const ranking = getSellerRanking();
   return ranking.findIndex(r => r.id === sellerId) + 1;
+}
+
+// Weekly sales by period for line chart
+export function getSalesByWeekAndPeriod() {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  const currentMonthSales = mockSales.filter(s => {
+    const d = new Date(s.date);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  });
+
+  const weeks = [1, 2, 3, 4];
+  return weeks.map(week => {
+    const weekSales = currentMonthSales.filter(s => s.week === week);
+    return {
+      name: `Semana ${week}`,
+      Manhã: weekSales.filter(s => s.period === 'morning').length,
+      Tarde: weekSales.filter(s => s.period === 'afternoon').length,
+      Noite: weekSales.filter(s => s.period === 'evening').length,
+    };
+  });
+}
+
+// AI metrics mock data
+export function getAIMetrics() {
+  const totalAnalyses = mockFeedbacks.length;
+  const errorRate = 2.3;
+  const tagDistribution = tagOptions.map(tag => ({
+    tag,
+    count: mockFeedbacks.filter(f => f.tags.includes(tag)).length,
+  })).sort((a, b) => b.count - a.count);
+
+  const recentFailures = [
+    { id: 'ai1', date: '2026-02-12', type: 'Timeout', message: 'Resposta da IA excedeu 30s', endpoint: '/api/ai-feedback' },
+    { id: 'ai2', date: '2026-02-11', type: 'Parse Error', message: 'Formato de resposta inválido', endpoint: '/api/ai-feedback' },
+    { id: 'ai3', date: '2026-02-10', type: 'Rate Limit', message: 'Limite de requisições atingido', endpoint: '/api/ai-feedback' },
+    { id: 'ai4', date: '2026-02-09', type: 'Timeout', message: 'Conexão com modelo perdida', endpoint: '/api/ai-analysis' },
+  ];
+
+  return { totalAnalyses, errorRate, tagDistribution, recentFailures };
 }

@@ -26,11 +26,8 @@ const App = () => {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={user ? <Navigate to={user.role === 'developer' ? '/dev' : user.role === 'admin' ? '/admin' : '/seller'} /> : <LoginPage onLogin={setUser} />} />
-            <Route path="/admin" element={user?.role === 'admin' ? <AdminDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
             <Route path="/admin/*" element={user?.role === 'admin' ? <AdminDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
-            <Route path="/seller" element={user?.role === 'seller' ? <SellerDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
             <Route path="/seller/*" element={user?.role === 'seller' ? <SellerDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
-            <Route path="/dev" element={user?.role === 'developer' ? <DevDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
             <Route path="/dev/*" element={user?.role === 'developer' ? <DevDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
