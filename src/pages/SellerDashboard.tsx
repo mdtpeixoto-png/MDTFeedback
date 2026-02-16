@@ -1,13 +1,13 @@
-import { useState } from "react";
 import { Routes, Route } from "react-router-dom";
-import SettingsPage from "@/pages/SettingsPage";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import MetricCard from "@/components/dashboard/MetricCard";
 import NotebookSystem from "@/components/seller/NotebookSystem";
 import {
-  User, mockFeedbacks, mockIdleLogs,
-  getSalesBySeller, getSellerPosition, getSellerRanking,
-} from "@/lib/mockData";
+  useSales, useSellerProfiles, useFeedbacks, useIdleLogs,
+  getSellerRankingFromData, getIdleSummaryFromData, parseList,
+} from "@/hooks/useDashboardData";
+import type { User } from "@/lib/mockData";
+import SettingsPage from "@/pages/SettingsPage";
 import { ShoppingCart, Trophy, Phone, Clock, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -17,14 +17,20 @@ interface SellerDashboardProps {
 }
 
 function SellerOverview({ user }: { user: User }) {
-  const sales = getSalesBySeller(user.id);
-  const position = getSellerPosition(user.id);
-  const totalSellers = getSellerRanking().length;
-  const feedbacks = mockFeedbacks.filter(f => f.sellerId === user.id);
-  const idleLog = mockIdleLogs.find(l => l.sellerId === user.id);
+  const { data: sales = [] } = useSales(user.id);
+  const { data: sellers = [] } = useSellerProfiles();
+  const { data: allSales = [] } = useSales();
+  const { data: feedbacks = [] } = useFeedbacks(user.id);
+  const { data: idleLogs = [] } = useIdleLogs(user.id);
 
-  const allStrengths = feedbacks.flatMap(f => f.strengths);
-  const allWeaknesses = feedbacks.flatMap(f => f.weaknesses);
+  const ranking = getSellerRankingFromData(allSales, sellers);
+  const position = ranking.findIndex(r => r.id === user.id) + 1;
+  const totalSellers = ranking.length;
+  const idleSummary = getIdleSummaryFromData(idleLogs, [{ user_id: user.id, name: user.name, email: user.email, avatar_url: null, is_active: true }]);
+  const idleLog = idleSummary[0];
+
+  const allStrengths = feedbacks.flatMap(f => parseList(f.strengths));
+  const allWeaknesses = feedbacks.flatMap(f => parseList(f.weaknesses));
   const strengthCounts = Object.entries(allStrengths.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>))
     .sort((a, b) => b[1] - a[1]);
   const weaknessCounts = Object.entries(allWeaknesses.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>))
@@ -34,7 +40,7 @@ function SellerOverview({ user }: { user: User }) {
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard label="Minhas Vendas" value={sales.length} icon={<ShoppingCart className="h-5 w-5" />} />
-        <MetricCard label="Posição no Ranking" value={`${position}º de ${totalSellers}`} icon={<Trophy className="h-5 w-5" />} />
+        <MetricCard label="Posição no Ranking" value={position > 0 ? `${position}º de ${totalSellers}` : "—"} icon={<Trophy className="h-5 w-5" />} />
         <MetricCard label="Ligações Analisadas" value={feedbacks.length} icon={<Phone className="h-5 w-5" />} />
         <MetricCard label="Tempo Ocioso Hoje" value={`${idleLog?.totalIdleMinutes || 0}min`} icon={<Clock className="h-5 w-5" />} />
       </div>
@@ -43,6 +49,7 @@ function SellerOverview({ user }: { user: User }) {
         <div className="glass-card p-5">
           <h3 className="text-sm font-semibold text-foreground mb-3">Pontos Fortes</h3>
           <div className="space-y-2">
+            {strengthCounts.length === 0 && <p className="text-sm text-muted-foreground">Sem dados ainda</p>}
             {strengthCounts.slice(0, 5).map(([s, count]) => (
               <div key={s} className="flex items-center justify-between">
                 <span className="text-sm text-foreground">{s}</span>
@@ -54,6 +61,7 @@ function SellerOverview({ user }: { user: User }) {
         <div className="glass-card p-5">
           <h3 className="text-sm font-semibold text-foreground mb-3">Pontos a Melhorar</h3>
           <div className="space-y-2">
+            {weaknessCounts.length === 0 && <p className="text-sm text-muted-foreground">Sem dados ainda</p>}
             {weaknessCounts.slice(0, 5).map(([s, count]) => (
               <div key={s} className="flex items-center justify-between">
                 <span className="text-sm text-foreground">{s}</span>
@@ -68,14 +76,17 @@ function SellerOverview({ user }: { user: User }) {
 }
 
 function SellerFeedbacks({ user }: { user: User }) {
-  const feedbacks = mockFeedbacks.filter(f => f.sellerId === user.id);
+  const { data: feedbacks = [] } = useFeedbacks(user.id);
 
   return (
     <div className="space-y-3">
+      {feedbacks.length === 0 && (
+        <div className="glass-card p-5 text-center text-sm text-muted-foreground">Nenhum feedback disponível ainda</div>
+      )}
       {feedbacks.map(fb => (
         <div key={fb.id} className="glass-card p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-muted-foreground">{fb.date}</span>
+            <span className="text-xs text-muted-foreground">{new Date(fb.created_at).toLocaleDateString("pt-BR")}</span>
             <div className="flex items-center gap-2">
               <span className={cn(
                 "text-xs font-medium px-2 py-0.5 rounded-full",
@@ -85,16 +96,16 @@ function SellerFeedbacks({ user }: { user: User }) {
               )}>
                 {fb.tone === 'positive' ? 'Positivo' : fb.tone === 'negative' ? 'Negativo' : 'Neutro'}
               </span>
-              <span className="text-xs font-bold text-primary">{fb.score}/100</span>
+              <span className="text-xs font-bold text-primary">{fb.score ?? 0}/100</span>
             </div>
           </div>
-          <p className="text-sm text-foreground mb-3">{fb.summary}</p>
+          <p className="text-sm text-foreground mb-3">{fb.summary ?? "Sem resumo"}</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
             <div>
               <h4 className="text-xs font-semibold text-success mb-1.5">Pontos Fortes</h4>
               <ul className="space-y-1">
-                {fb.strengths.map(s => (
+                {parseList(fb.strengths).map(s => (
                   <li key={s} className="text-xs text-foreground flex items-center gap-1.5">
                     <span className="h-1 w-1 rounded-full bg-success" />{s}
                   </li>
@@ -104,19 +115,13 @@ function SellerFeedbacks({ user }: { user: User }) {
             <div>
               <h4 className="text-xs font-semibold text-warning mb-1.5">Pontos a Melhorar</h4>
               <ul className="space-y-1">
-                {fb.weaknesses.map(w => (
+                {parseList(fb.weaknesses).map(w => (
                   <li key={w} className="text-xs text-foreground flex items-center gap-1.5">
                     <span className="h-1 w-1 rounded-full bg-warning" />{w}
                   </li>
                 ))}
               </ul>
             </div>
-          </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {fb.tags.map(tag => (
-              <span key={tag} className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">{tag}</span>
-            ))}
           </div>
         </div>
       ))}
@@ -125,24 +130,16 @@ function SellerFeedbacks({ user }: { user: User }) {
 }
 
 function SellerRanking({ user }: { user: User }) {
-  const ranking = getSellerRanking();
-  const position = getSellerPosition(user.id);
+  const { data: sellers = [] } = useSellerProfiles();
+  const { data: allSales = [] } = useSales();
+  const ranking = getSellerRankingFromData(allSales, sellers);
+  const position = ranking.findIndex(r => r.id === user.id) + 1;
   const totalSellers = ranking.length;
-
-  // Mock position evolution
-  const positionHistory = [
-    { month: 'Set', position: Math.min(position + 2, totalSellers) },
-    { month: 'Out', position: Math.min(position + 1, totalSellers) },
-    { month: 'Nov', position },
-    { month: 'Dez', position: Math.max(position - 1, 1) },
-    { month: 'Jan', position },
-    { month: 'Fev', position },
-  ];
 
   return (
     <div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <MetricCard label="Posição Atual" value={`${position}º`} icon={<Trophy className="h-5 w-5" />} />
+        <MetricCard label="Posição Atual" value={position > 0 ? `${position}º` : "—"} icon={<Trophy className="h-5 w-5" />} />
         <MetricCard label="Total de Vendedores" value={totalSellers} icon={<TrendingUp className="h-5 w-5" />} />
       </div>
 
@@ -154,6 +151,9 @@ function SellerRanking({ user }: { user: User }) {
           </h3>
         </div>
         <div className="divide-y divide-border">
+          {ranking.length === 0 && (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhum vendedor no ranking</div>
+          )}
           {ranking.map((seller, index) => (
             <div
               key={seller.id}
@@ -176,24 +176,6 @@ function SellerRanking({ user }: { user: User }) {
                   {seller.id === user.id ? `${seller.name} (Você)` : seller.name}
                 </p>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="glass-card p-5">
-        <h3 className="text-sm font-semibold text-foreground mb-4">Evolução da Posição</h3>
-        <div className="flex items-end gap-4 h-40">
-          {positionHistory.map((h, i) => (
-            <div key={i} className="flex-1 flex flex-col items-center gap-2">
-              <span className="text-xs font-bold text-primary">{h.position}º</span>
-              <div
-                className="w-full rounded-t-md bg-primary/20 transition-all"
-                style={{ height: `${((totalSellers - h.position + 1) / totalSellers) * 100}%` }}
-              >
-                <div className="w-full h-full rounded-t-md bg-primary/60" />
-              </div>
-              <span className="text-[10px] text-muted-foreground">{h.month}</span>
             </div>
           ))}
         </div>
