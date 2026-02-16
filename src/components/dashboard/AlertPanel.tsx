@@ -1,9 +1,16 @@
 import { AlertTriangle, Clock } from "lucide-react";
-import { IdleLog } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 
+interface IdleLogSummary {
+  sellerId: string;
+  sellerName: string;
+  totalIdleMinutes: number;
+  idlePeriods: number;
+  daysSinceLastSale: number;
+}
+
 interface AlertPanelProps {
-  idleLogs: IdleLog[];
+  idleLogs: IdleLogSummary[];
 }
 
 export default function AlertPanel({ idleLogs }: AlertPanelProps) {
@@ -16,6 +23,9 @@ export default function AlertPanel({ idleLogs }: AlertPanelProps) {
         <h3 className="text-sm font-semibold text-foreground">Alertas Operacionais</h3>
       </div>
       <div className="divide-y divide-border">
+        {sorted.length === 0 && (
+          <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhum alerta no momento</div>
+        )}
         {sorted.map((log) => (
           <div key={log.sellerId} className="px-5 py-3 flex items-center gap-4">
             <div className={cn(

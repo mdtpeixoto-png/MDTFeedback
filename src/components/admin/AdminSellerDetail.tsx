@@ -1,28 +1,34 @@
 import { useParams, Link } from "react-router-dom";
 import MetricCard from "@/components/dashboard/MetricCard";
 import {
-  mockUsers, mockSales, mockFeedbacks, mockIdleLogs,
-  getSalesBySeller, getSellerPosition, getSellerRanking,
-} from "@/lib/mockData";
+  useSales, useSellerProfiles, useFeedbacks, useIdleLogs,
+  getSellerRankingFromData, getIdleSummaryFromData, parseList,
+} from "@/hooks/useDashboardData";
 import { ShoppingCart, Trophy, Phone, Clock, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AdminSellerDetail() {
   const { id } = useParams<{ id: string }>();
-  const seller = mockUsers.find(u => u.id === id);
+  const { data: sellers = [] } = useSellerProfiles();
+  const { data: allSales = [] } = useSales();
+  const { data: feedbacks = [] } = useFeedbacks(id);
+  const { data: idleLogs = [] } = useIdleLogs(id);
+
+  const seller = sellers.find(s => s.user_id === id);
 
   if (!seller) {
     return <div className="text-muted-foreground">Vendedor não encontrado.</div>;
   }
 
-  const sales = getSalesBySeller(seller.id);
-  const position = getSellerPosition(seller.id);
-  const totalSellers = getSellerRanking().length;
-  const feedbacks = mockFeedbacks.filter(f => f.sellerId === seller.id);
-  const idleLog = mockIdleLogs.find(l => l.sellerId === seller.id);
+  const sales = allSales.filter(s => s.user_id === id);
+  const ranking = getSellerRankingFromData(allSales, sellers);
+  const position = ranking.findIndex(r => r.id === id) + 1;
+  const totalSellers = ranking.length;
+  const idleSummary = getIdleSummaryFromData(idleLogs, [seller]);
+  const idleLog = idleSummary[0];
 
-  const allStrengths = feedbacks.flatMap(f => f.strengths);
-  const allWeaknesses = feedbacks.flatMap(f => f.weaknesses);
+  const allStrengths = feedbacks.flatMap(f => parseList(f.strengths));
+  const allWeaknesses = feedbacks.flatMap(f => parseList(f.weaknesses));
   const strengthCounts = Object.entries(allStrengths.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>))
     .sort((a, b) => b[1] - a[1]);
   const weaknessCounts = Object.entries(allWeaknesses.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>))
@@ -38,15 +44,16 @@ export default function AdminSellerDetail() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard label="Vendas" value={sales.length} icon={<ShoppingCart className="h-5 w-5" />} />
-        <MetricCard label="Posição" value={`${position}º de ${totalSellers}`} icon={<Trophy className="h-5 w-5" />} />
+        <MetricCard label="Posição" value={position > 0 ? `${position}º de ${totalSellers}` : "—"} icon={<Trophy className="h-5 w-5" />} />
         <MetricCard label="Ligações" value={feedbacks.length} icon={<Phone className="h-5 w-5" />} />
-        <MetricCard label="Dias s/ Venda" value={idleLog?.daysSinceLastSale || 0} icon={<Clock className="h-5 w-5" />} />
+        <MetricCard label="Dias s/ Venda" value={idleLog?.daysSinceLastSale ?? 0} icon={<Clock className="h-5 w-5" />} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className="glass-card p-5">
           <h4 className="text-sm font-semibold text-foreground mb-3">Pontos Fortes</h4>
           <div className="space-y-2">
+            {strengthCounts.length === 0 && <p className="text-sm text-muted-foreground">Sem dados</p>}
             {strengthCounts.slice(0, 5).map(([s, count]) => (
               <div key={s} className="flex items-center justify-between">
                 <span className="text-sm text-foreground">{s}</span>
@@ -58,6 +65,7 @@ export default function AdminSellerDetail() {
         <div className="glass-card p-5">
           <h4 className="text-sm font-semibold text-foreground mb-3">Pontos a Melhorar</h4>
           <div className="space-y-2">
+            {weaknessCounts.length === 0 && <p className="text-sm text-muted-foreground">Sem dados</p>}
             {weaknessCounts.slice(0, 5).map(([s, count]) => (
               <div key={s} className="flex items-center justify-between">
                 <span className="text-sm text-foreground">{s}</span>
@@ -71,14 +79,14 @@ export default function AdminSellerDetail() {
       <div className="glass-card p-5 mb-6">
         <h4 className="text-sm font-semibold text-foreground mb-3">Tempo Ocioso</h4>
         <div className="text-sm text-muted-foreground space-y-1">
-          <p>Total ocioso: <span className="text-foreground font-mono">{idleLog?.totalIdleMinutes || 0} min</span></p>
-          <p>Períodos ociosos: <span className="text-foreground font-mono">{idleLog?.idlePeriods || 0}x</span></p>
+          <p>Total ocioso: <span className="text-foreground font-mono">{idleLog?.totalIdleMinutes ?? 0} min</span></p>
+          <p>Períodos ociosos: <span className="text-foreground font-mono">{idleLog?.idlePeriods ?? 0}x</span></p>
           <p>Dias sem vender: <span className={cn(
             "font-mono text-xs px-2 py-0.5 rounded-full",
-            (idleLog?.daysSinceLastSale || 0) >= 3 ? "bg-destructive/10 text-destructive" :
-            (idleLog?.daysSinceLastSale || 0) >= 1 ? "bg-warning/10 text-warning" :
+            (idleLog?.daysSinceLastSale ?? 0) >= 3 ? "bg-destructive/10 text-destructive" :
+            (idleLog?.daysSinceLastSale ?? 0) >= 1 ? "bg-warning/10 text-warning" :
             "bg-success/10 text-success"
-          )}>{idleLog?.daysSinceLastSale || 0}d</span></p>
+          )}>{idleLog?.daysSinceLastSale ?? 0}d</span></p>
         </div>
       </div>
 
@@ -89,10 +97,13 @@ export default function AdminSellerDetail() {
           <span className="ml-auto text-xs text-muted-foreground">{feedbacks.length} ligações</span>
         </div>
         <div className="divide-y divide-border">
+          {feedbacks.length === 0 && (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhum feedback disponível</div>
+          )}
           {feedbacks.map(fb => (
             <div key={fb.id} className="p-5">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-muted-foreground">{fb.date}</span>
+                <span className="text-xs text-muted-foreground">{new Date(fb.created_at).toLocaleDateString("pt-BR")}</span>
                 <div className="flex items-center gap-2">
                   <span className={cn(
                     "text-xs font-medium px-2 py-0.5 rounded-full",
@@ -102,15 +113,15 @@ export default function AdminSellerDetail() {
                   )}>
                     {fb.tone === 'positive' ? 'Positivo' : fb.tone === 'negative' ? 'Negativo' : 'Neutro'}
                   </span>
-                  <span className="text-xs font-bold text-primary">{fb.score}/100</span>
+                  <span className="text-xs font-bold text-primary">{fb.score ?? 0}/100</span>
                 </div>
               </div>
-              <p className="text-sm text-foreground mb-3">{fb.summary}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <p className="text-sm text-foreground mb-3">{fb.summary ?? "Sem resumo"}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <h5 className="text-xs font-semibold text-success mb-1">Pontos Fortes</h5>
                   <ul className="space-y-1">
-                    {fb.strengths.map(s => (
+                    {parseList(fb.strengths).map(s => (
                       <li key={s} className="text-xs text-foreground flex items-center gap-1.5">
                         <span className="h-1 w-1 rounded-full bg-success" />{s}
                       </li>
@@ -120,18 +131,13 @@ export default function AdminSellerDetail() {
                 <div>
                   <h5 className="text-xs font-semibold text-warning mb-1">Pontos a Melhorar</h5>
                   <ul className="space-y-1">
-                    {fb.weaknesses.map(w => (
+                    {parseList(fb.weaknesses).map(w => (
                       <li key={w} className="text-xs text-foreground flex items-center gap-1.5">
                         <span className="h-1 w-1 rounded-full bg-warning" />{w}
                       </li>
                     ))}
                   </ul>
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {fb.tags.map(tag => (
-                  <span key={tag} className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary text-secondary-foreground">{tag}</span>
-                ))}
               </div>
             </div>
           ))}

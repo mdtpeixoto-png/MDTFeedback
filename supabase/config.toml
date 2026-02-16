@@ -1,1 +1,4 @@
 project_id = "miwiumgvnspnmxdmfnut"
+
+[functions.ingest-data]
+verify_jwt = false
