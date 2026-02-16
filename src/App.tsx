@@ -1,13 +1,13 @@
-import { useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { User } from "@/lib/mockData";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import LoginPage from "./pages/LoginPage";
+import PendingApprovalPage from "./pages/PendingApprovalPage";
 import AdminDashboard from "./pages/AdminDashboard";
 import SellerDashboard from "./pages/SellerDashboard";
 import DevDashboard from "./pages/DevDashboard";
@@ -15,11 +15,72 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+function AppRoutes() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Not logged in
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="*" element={<LoginPage />} />
+      </Routes>
+    );
+  }
+
+  // Logged in but no role assigned
+  if (!user.role) {
+    return (
+      <Routes>
+        <Route path="*" element={<PendingApprovalPage />} />
+      </Routes>
+    );
+  }
+
+  // Build a compatible User object for legacy dashboard components
+  const legacyUser = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    avatar: user.avatar,
+  };
+
+  const handleLogout = async () => {
+    const { signOut } = await import("@/contexts/AuthContext").then(m => {
+      // This is a workaround; we use the hook inside the component tree
+      return { signOut: () => {} };
+    });
+  };
+
+  return <AuthenticatedRoutes legacyUser={legacyUser} />;
+}
+
+function AuthenticatedRoutes({ legacyUser }: { legacyUser: { id: string; name: string; email: string; role: "developer" | "admin" | "seller"; avatar?: string } }) {
+  const { signOut } = useAuth();
+  const role = legacyUser.role;
+
+  const homePath = role === "developer" ? "/dev" : role === "admin" ? "/admin" : "/seller";
+
+  return (
+    <Routes>
+      <Route path="/" element={<Navigate to={homePath} />} />
+      <Route path="/admin/*" element={role === "admin" ? <AdminDashboard user={legacyUser} onLogout={signOut} /> : <Navigate to="/" />} />
+      <Route path="/seller/*" element={role === "seller" ? <SellerDashboard user={legacyUser} onLogout={signOut} /> : <Navigate to="/" />} />
+      <Route path="/dev/*" element={role === "developer" ? <DevDashboard user={legacyUser} onLogout={signOut} /> : <Navigate to="/" />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  );
+}
+
 const App = () => {
-  const [user, setUser] = useState<User | null>(null);
-
-  const handleLogout = () => setUser(null);
-
   return (
     <ErrorBoundary>
       <ThemeProvider>
@@ -28,13 +89,9 @@ const App = () => {
             <Toaster />
             <Sonner />
             <BrowserRouter>
-              <Routes>
-                <Route path="/" element={user ? <Navigate to={user.role === 'developer' ? '/dev' : user.role === 'admin' ? '/admin' : '/seller'} /> : <LoginPage onLogin={setUser} />} />
-                <Route path="/admin/*" element={user?.role === 'admin' ? <AdminDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
-                <Route path="/seller/*" element={user?.role === 'seller' ? <SellerDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
-                <Route path="/dev/*" element={user?.role === 'developer' ? <DevDashboard user={user} onLogout={handleLogout} /> : <Navigate to="/" />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
+              <AuthProvider>
+                <AppRoutes />
+              </AuthProvider>
             </BrowserRouter>
           </TooltipProvider>
         </QueryClientProvider>
