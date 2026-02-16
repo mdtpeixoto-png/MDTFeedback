@@ -14,16 +14,339 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_error_logs: {
+        Row: {
+          call_id: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+        }
+        Insert: {
+          call_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+        }
+        Update: {
+          call_id?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_error_logs_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_feedbacks: {
+        Row: {
+          call_id: string
+          created_at: string
+          id: string
+          score: number | null
+          strengths: string | null
+          summary: string | null
+          tone: string | null
+          weaknesses: string | null
+        }
+        Insert: {
+          call_id: string
+          created_at?: string
+          id?: string
+          score?: number | null
+          strengths?: string | null
+          summary?: string | null
+          tone?: string | null
+          weaknesses?: string | null
+        }
+        Update: {
+          call_id?: string
+          created_at?: string
+          id?: string
+          score?: number | null
+          strengths?: string | null
+          summary?: string | null
+          tone?: string | null
+          weaknesses?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_feedbacks_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: true
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      call_tags: {
+        Row: {
+          call_id: string
+          tag_id: string
+        }
+        Insert: {
+          call_id: string
+          tag_id: string
+        }
+        Update: {
+          call_id?: string
+          tag_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "call_tags_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "call_tags_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calls: {
+        Row: {
+          call_datetime: string
+          created_at: string
+          duration_seconds: number | null
+          had_sale: boolean | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          call_datetime?: string
+          created_at?: string
+          duration_seconds?: number | null
+          had_sale?: boolean | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          call_datetime?: string
+          created_at?: string
+          duration_seconds?: number | null
+          had_sale?: boolean | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      idle_time_logs: {
+        Row: {
+          created_at: string
+          days_since_last_sale: number | null
+          duration_seconds: number | null
+          end_time: string | null
+          id: string
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          days_since_last_sale?: number | null
+          duration_seconds?: number | null
+          end_time?: string | null
+          id?: string
+          start_time: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          days_since_last_sale?: number | null
+          duration_seconds?: number | null
+          end_time?: string | null
+          id?: string
+          start_time?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notebook_pages: {
+        Row: {
+          content: string | null
+          created_at: string
+          id: string
+          notebook_id: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          notebook_id: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          id?: string
+          notebook_id?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notebook_pages_notebook_id_fkey"
+            columns: ["notebook_id"]
+            isOneToOne: false
+            referencedRelation: "notebooks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notebooks: {
+        Row: {
+          created_at: string
+          id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      sales: {
+        Row: {
+          created_at: string
+          id: string
+          period: string | null
+          plan: string | null
+          product: string
+          sale_date: string
+          user_id: string
+          value: number | null
+          week: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          period?: string | null
+          plan?: string | null
+          product: string
+          sale_date?: string
+          user_id: string
+          value?: number | null
+          week?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          period?: string | null
+          plan?: string | null
+          product?: string
+          sale_date?: string
+          user_id?: string
+          value?: number | null
+          week?: number | null
+        }
+        Relationships: []
+      }
+      tags: {
+        Row: {
+          id: string
+          name: string
+        }
+        Insert: {
+          id?: string
+          name: string
+        }
+        Update: {
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "developer" | "admin" | "seller"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +473,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["developer", "admin", "seller"],
+    },
   },
 } as const
