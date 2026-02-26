@@ -3,10 +3,10 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import MetricCard from "@/components/dashboard/MetricCard";
 import NotebookSystem from "@/components/seller/NotebookSystem";
 import {
-  useSales, useSellerProfiles, useFeedbacks, useIdleLogs,
-  getSellerRankingFromData, getIdleSummaryFromData, parseList,
-} from "@/hooks/useDashboardData";
-import type { User } from "@/lib/mockData";
+  mockSales, mockUsers, mockFeedbacks, mockIdleLogs,
+  getSellerRanking, getSellerPosition, getSalesBySeller,
+  type User,
+} from "@/lib/mockData";
 import SettingsPage from "@/pages/SettingsPage";
 import { ShoppingCart, Trophy, Phone, Clock, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,24 +17,20 @@ interface SellerDashboardProps {
 }
 
 function SellerOverview({ user }: { user: User }) {
-  const { data: sales = [] } = useSales(user.id);
-  const { data: sellers = [] } = useSellerProfiles();
-  const { data: allSales = [] } = useSales();
-  const { data: feedbacks = [] } = useFeedbacks(user.id);
-  const { data: idleLogs = [] } = useIdleLogs(user.id);
-
-  const ranking = getSellerRankingFromData(allSales, sellers);
-  const position = ranking.findIndex(r => r.id === user.id) + 1;
+  const sales = getSalesBySeller(user.id);
+  const ranking = getSellerRanking();
+  const position = getSellerPosition(user.id);
   const totalSellers = ranking.length;
-  const idleSummary = getIdleSummaryFromData(idleLogs, [{ user_id: user.id, name: user.name, email: user.email, avatar_url: null, is_active: true }]);
-  const idleLog = idleSummary[0];
+  const feedbacks = mockFeedbacks.filter(f => f.sellerId === user.id);
+  const idleLog = mockIdleLogs.find(l => l.sellerId === user.id);
 
-  const allStrengths = feedbacks.flatMap(f => parseList(f.strengths));
-  const allWeaknesses = feedbacks.flatMap(f => parseList(f.weaknesses));
-  const strengthCounts = Object.entries(allStrengths.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>))
-    .sort((a, b) => b[1] - a[1]);
-  const weaknessCounts = Object.entries(allWeaknesses.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>))
-    .sort((a, b) => b[1] - a[1]);
+  const strengthCounts = Object.entries(
+    feedbacks.flatMap(f => f.strengths).reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>)
+  ).sort((a, b) => b[1] - a[1]);
+
+  const weaknessCounts = Object.entries(
+    feedbacks.flatMap(f => f.weaknesses).reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>)
+  ).sort((a, b) => b[1] - a[1]);
 
   return (
     <>
@@ -76,7 +72,7 @@ function SellerOverview({ user }: { user: User }) {
 }
 
 function SellerFeedbacks({ user }: { user: User }) {
-  const { data: feedbacks = [] } = useFeedbacks(user.id);
+  const feedbacks = mockFeedbacks.filter(f => f.sellerId === user.id);
 
   return (
     <div className="space-y-3">
@@ -86,7 +82,7 @@ function SellerFeedbacks({ user }: { user: User }) {
       {feedbacks.map(fb => (
         <div key={fb.id} className="glass-card p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-muted-foreground">{new Date(fb.created_at).toLocaleDateString("pt-BR")}</span>
+            <span className="text-xs text-muted-foreground">{new Date(fb.date).toLocaleDateString("pt-BR")}</span>
             <div className="flex items-center gap-2">
               <span className={cn(
                 "text-xs font-medium px-2 py-0.5 rounded-full",
@@ -96,16 +92,16 @@ function SellerFeedbacks({ user }: { user: User }) {
               )}>
                 {fb.tone === 'positive' ? 'Positivo' : fb.tone === 'negative' ? 'Negativo' : 'Neutro'}
               </span>
-              <span className="text-xs font-bold text-primary">{fb.score ?? 0}/100</span>
+              <span className="text-xs font-bold text-primary">{fb.score}/100</span>
             </div>
           </div>
-          <p className="text-sm text-foreground mb-3">{fb.summary ?? "Sem resumo"}</p>
+          <p className="text-sm text-foreground mb-3">{fb.summary}</p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <h4 className="text-xs font-semibold text-success mb-1.5">Pontos Fortes</h4>
               <ul className="space-y-1">
-                {parseList(fb.strengths).map(s => (
+                {fb.strengths.map(s => (
                   <li key={s} className="text-xs text-foreground flex items-center gap-1.5">
                     <span className="h-1 w-1 rounded-full bg-success" />{s}
                   </li>
@@ -115,7 +111,7 @@ function SellerFeedbacks({ user }: { user: User }) {
             <div>
               <h4 className="text-xs font-semibold text-warning mb-1.5">Pontos a Melhorar</h4>
               <ul className="space-y-1">
-                {parseList(fb.weaknesses).map(w => (
+                {fb.weaknesses.map(w => (
                   <li key={w} className="text-xs text-foreground flex items-center gap-1.5">
                     <span className="h-1 w-1 rounded-full bg-warning" />{w}
                   </li>
@@ -130,10 +126,8 @@ function SellerFeedbacks({ user }: { user: User }) {
 }
 
 function SellerRanking({ user }: { user: User }) {
-  const { data: sellers = [] } = useSellerProfiles();
-  const { data: allSales = [] } = useSales();
-  const ranking = getSellerRankingFromData(allSales, sellers);
-  const position = ranking.findIndex(r => r.id === user.id) + 1;
+  const ranking = getSellerRanking();
+  const position = getSellerPosition(user.id);
   const totalSellers = ranking.length;
 
   return (
@@ -151,9 +145,6 @@ function SellerRanking({ user }: { user: User }) {
           </h3>
         </div>
         <div className="divide-y divide-border">
-          {ranking.length === 0 && (
-            <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhum vendedor no ranking</div>
-          )}
           {ranking.map((seller, index) => (
             <div
               key={seller.id}
