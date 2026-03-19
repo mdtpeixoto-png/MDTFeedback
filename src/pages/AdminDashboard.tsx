@@ -7,12 +7,11 @@ import AlertPanel from "@/components/dashboard/AlertPanel";
 import AdminSellerDetail from "@/components/admin/AdminSellerDetail";
 import SettingsPage from "@/pages/SettingsPage";
 import {
-  useSellerProfiles, useSales, useFeedbacks, useIdleLogs,
+  useSellerProfiles, useSales, useFeedbacks, useIdleLogs, useCalls,
   getSellerRankingFromData, getSalesByProductFromData, getSalesByWeekAndPeriodFromData,
-  getIdleSummaryFromData, parseList,
-  type SellerProfile, type SaleRow,
+  getIdleSummaryFromData,
 } from "@/hooks/useDashboardData";
-import { useAuth, type AppUser } from "@/contexts/AuthContext";
+import { type AppUser } from "@/contexts/AuthContext";
 import { DollarSign, TrendingUp, Users, ShoppingCart, Phone } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -110,9 +109,8 @@ function AdminSellers() {
 function AdminCalls() {
   const { data: feedbacks = [] } = useFeedbacks();
   const { data: sellers = [] } = useSellerProfiles();
-  const { data: allCalls = [] } = (await import("@/hooks/useDashboardData")).useCalls();
+  const { data: allCalls = [] } = useCalls();
 
-  // Build a map of call_id -> user_id -> seller name
   const callUserMap = new Map(allCalls.map(c => [c.id, c.user_id]));
   const sellerMap = new Map(sellers.map(s => [s.user_id, s.name]));
 
@@ -141,7 +139,7 @@ function AdminCalls() {
                 )}>
                   {fb.tone === 'positive' ? 'Positivo' : fb.tone === 'negative' ? 'Negativo' : 'Neutro'}
                 </span>
-                <span className="text-xs font-bold text-primary">{fb.score}/100</span>
+                {fb.score && <span className="text-xs font-bold text-primary">{fb.score}/100</span>}
               </div>
             </div>
             {sellerName && <p className="text-sm text-muted-foreground mb-1"><span className="font-medium text-foreground">{sellerName}</span></p>}
@@ -180,7 +178,7 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       } />
       <Route path="calls" element={
         <DashboardLayout user={user} onLogout={onLogout} title="Ligações" subtitle="Feedbacks de ligações analisadas">
-          <AdminCallsWrapper />
+          <AdminCalls />
         </DashboardLayout>
       } />
       <Route path="alerts" element={
