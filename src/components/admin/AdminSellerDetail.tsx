@@ -1,35 +1,29 @@
 import { useParams, Link } from "react-router-dom";
 import MetricCard from "@/components/dashboard/MetricCard";
 import {
-  useSellerProfiles, useSales, useFeedbacks, useIdleLogs,
-  getSellerRankingFromData, getIdleSummaryFromData, parseList,
-} from "@/hooks/useDashboardData";
+  mockUsers, mockSales, mockFeedbacks, mockIdleLogs,
+  getSellerRanking, getSellerPosition,
+} from "@/lib/mockData";
 import { ShoppingCart, Trophy, Phone, Clock, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function AdminSellerDetail() {
   const { id } = useParams<{ id: string }>();
-  const { data: sellers = [] } = useSellerProfiles();
-  const { data: allSales = [] } = useSales();
-  const { data: feedbacks = [] } = useFeedbacks(id);
-  const { data: idleLogs = [] } = useIdleLogs(id);
 
-  const seller = sellers.find(s => s.user_id === id);
+  const seller = mockUsers.find(s => s.id === id && s.role === 'seller');
 
   if (!seller) {
     return <div className="text-muted-foreground">Vendedor não encontrado.</div>;
   }
 
-  const mySales = allSales.filter(s => s.user_id === id);
-  const ranking = getSellerRankingFromData(allSales, sellers);
-  const position = ranking.findIndex(r => r.id === id) + 1;
-  const totalSellers = ranking.length;
+  const mySales = mockSales.filter(s => s.sellerId === id);
+  const position = getSellerPosition(id!);
+  const totalSellers = getSellerRanking().length;
+  const myFeedbacks = mockFeedbacks.filter(f => f.sellerId === id);
+  const myIdle = mockIdleLogs.find(l => l.sellerId === id);
 
-  const idleSummary = getIdleSummaryFromData(idleLogs, [seller]);
-  const myIdle = idleSummary[0];
-
-  const allStrengths = feedbacks.flatMap(f => parseList(f.strengths));
-  const allWeaknesses = feedbacks.flatMap(f => parseList(f.weaknesses));
+  const allStrengths = myFeedbacks.flatMap(f => f.strengths);
+  const allWeaknesses = myFeedbacks.flatMap(f => f.weaknesses);
   const strengthCounts = Object.entries(allStrengths.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>))
     .sort((a, b) => b[1] - a[1]);
   const weaknessCounts = Object.entries(allWeaknesses.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>))
@@ -46,7 +40,7 @@ export default function AdminSellerDetail() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard label="Vendas" value={mySales.length} icon={<ShoppingCart className="h-5 w-5" />} />
         <MetricCard label="Posição" value={position > 0 ? `${position}º de ${totalSellers}` : "—"} icon={<Trophy className="h-5 w-5" />} />
-        <MetricCard label="Ligações" value={feedbacks.length} icon={<Phone className="h-5 w-5" />} />
+        <MetricCard label="Ligações" value={myFeedbacks.length} icon={<Phone className="h-5 w-5" />} />
         <MetricCard label="Dias s/ Venda" value={myIdle?.daysSinceLastSale ?? 0} icon={<Clock className="h-5 w-5" />} />
       </div>
 
@@ -95,57 +89,53 @@ export default function AdminSellerDetail() {
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">
           <Phone className="h-4 w-4 text-primary" />
           <h4 className="text-sm font-semibold text-foreground">Feedbacks de Ligações</h4>
-          <span className="ml-auto text-xs text-muted-foreground">{feedbacks.length} ligações</span>
+          <span className="ml-auto text-xs text-muted-foreground">{myFeedbacks.length} ligações</span>
         </div>
         <div className="divide-y divide-border">
-          {feedbacks.length === 0 && (
+          {myFeedbacks.length === 0 && (
             <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhum feedback disponível</div>
           )}
-          {feedbacks.map(fb => {
-            const strengths = parseList(fb.strengths);
-            const weaknesses = parseList(fb.weaknesses);
-            return (
-              <div key={fb.id} className="p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs text-muted-foreground">{new Date(fb.created_at).toLocaleDateString("pt-BR")}</span>
-                  <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-xs font-medium px-2 py-0.5 rounded-full",
-                      fb.tone === 'positive' ? "bg-success/10 text-success" :
-                      fb.tone === 'negative' ? "bg-destructive/10 text-destructive" :
-                      "bg-muted text-muted-foreground"
-                    )}>
-                      {fb.tone === 'positive' ? 'Positivo' : fb.tone === 'negative' ? 'Negativo' : 'Neutro'}
-                    </span>
-                    {fb.score && <span className="text-xs font-bold text-primary">{fb.score}/100</span>}
-                  </div>
-                </div>
-                <p className="text-sm text-foreground mb-3">{fb.summary}</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <h5 className="text-xs font-semibold text-success mb-1">Pontos Fortes</h5>
-                    <ul className="space-y-1">
-                      {strengths.map(s => (
-                        <li key={s} className="text-xs text-foreground flex items-center gap-1.5">
-                          <span className="h-1 w-1 rounded-full bg-success" />{s}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h5 className="text-xs font-semibold text-warning mb-1">Pontos a Melhorar</h5>
-                    <ul className="space-y-1">
-                      {weaknesses.map(w => (
-                        <li key={w} className="text-xs text-foreground flex items-center gap-1.5">
-                          <span className="h-1 w-1 rounded-full bg-warning" />{w}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
+          {myFeedbacks.map(fb => (
+            <div key={fb.id} className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-muted-foreground">{new Date(fb.date).toLocaleDateString("pt-BR")}</span>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "text-xs font-medium px-2 py-0.5 rounded-full",
+                    fb.tone === 'positive' ? "bg-success/10 text-success" :
+                    fb.tone === 'negative' ? "bg-destructive/10 text-destructive" :
+                    "bg-muted text-muted-foreground"
+                  )}>
+                    {fb.tone === 'positive' ? 'Positivo' : fb.tone === 'negative' ? 'Negativo' : 'Neutro'}
+                  </span>
+                  <span className="text-xs font-bold text-primary">{fb.score}/100</span>
                 </div>
               </div>
-            );
-          })}
+              <p className="text-sm text-foreground mb-3">{fb.summary}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <h5 className="text-xs font-semibold text-success mb-1">Pontos Fortes</h5>
+                  <ul className="space-y-1">
+                    {fb.strengths.map(s => (
+                      <li key={s} className="text-xs text-foreground flex items-center gap-1.5">
+                        <span className="h-1 w-1 rounded-full bg-success" />{s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h5 className="text-xs font-semibold text-warning mb-1">Pontos a Melhorar</h5>
+                  <ul className="space-y-1">
+                    {fb.weaknesses.map(w => (
+                      <li key={w} className="text-xs text-foreground flex items-center gap-1.5">
+                        <span className="h-1 w-1 rounded-full bg-warning" />{w}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
