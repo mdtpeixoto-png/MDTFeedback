@@ -47,9 +47,27 @@ export const mockUsers: User[] = [
   { id: '4', name: 'Mariana Costa', email: 'mariana@mdt.com', role: 'seller' },
   { id: '5', name: 'Lucas Oliveira', email: 'lucas@mdt.com', role: 'seller' },
   { id: '6', name: 'Juliana Santos', email: 'juliana@mdt.com', role: 'seller' },
-  { id: '7', name: 'Rafael Mendes', email: 'rafael@mdt.com', role: 'admin' },
-  { id: '8', name: 'Dev Master', email: 'dev@mdt.com', role: 'developer' },
+  { id: '7', name: 'Fernanda Almeida', email: 'fernanda@mdt.com', role: 'seller' },
+  { id: '8', name: 'Bruno Nascimento', email: 'bruno@mdt.com', role: 'seller' },
+  { id: '9', name: 'Camila Ferreira', email: 'camila@mdt.com', role: 'seller' },
+  { id: '10', name: 'Diego Barbosa', email: 'diego@mdt.com', role: 'seller' },
+  { id: '11', name: 'Eduarda Rocha', email: 'eduarda@mdt.com', role: 'seller' },
+  { id: '12', name: 'Felipe Cardoso', email: 'felipe@mdt.com', role: 'seller' },
+  { id: '13', name: 'Gabriela Martins', email: 'gabriela@mdt.com', role: 'seller' },
+  { id: '14', name: 'Henrique Moura', email: 'henrique@mdt.com', role: 'seller' },
+  { id: '15', name: 'Isabela Teixeira', email: 'isabela@mdt.com', role: 'seller' },
+  { id: '16', name: 'João Ribeiro', email: 'joao@mdt.com', role: 'seller' },
+  { id: '17', name: 'Larissa Dias', email: 'larissa@mdt.com', role: 'seller' },
+  { id: '18', name: 'Matheus Araújo', email: 'matheus@mdt.com', role: 'seller' },
+  { id: '19', name: 'Natália Correia', email: 'natalia@mdt.com', role: 'seller' },
+  { id: '20', name: 'Otávio Pereira', email: 'otavio@mdt.com', role: 'seller' },
+  { id: '21', name: 'Rafael Mendes', email: 'rafael@mdt.com', role: 'admin' },
+  { id: '22', name: 'Beatriz Lopes', email: 'beatriz@mdt.com', role: 'admin' },
+  { id: '23', name: 'Dev Master', email: 'dev@mdt.com', role: 'developer' },
 ];
+
+const sellerUsers = mockUsers.filter(u => u.role === 'seller');
+const sellerCount = sellerUsers.length;
 
 const products: Sale['product'][] = ['Claro', 'Nio', 'Giga Mais'];
 const plans = ['250MB', '500MB', '1GB', '2GB', '5GB'];
@@ -67,8 +85,8 @@ function getWeekOfMonth(dateStr: string): number {
   return Math.min(Math.ceil(day / 7), 4);
 }
 
-export const mockSales: Sale[] = Array.from({ length: 120 }, (_, i) => {
-  const seller = mockUsers.filter(u => u.role === 'seller')[Math.floor(Math.random() * 6)];
+export const mockSales: Sale[] = Array.from({ length: 400 }, (_, i) => {
+  const seller = sellerUsers[Math.floor(Math.random() * sellerCount)];
   const date = randomDate(60);
   return {
     id: `s${i}`,
@@ -93,32 +111,30 @@ const weaknessOptions = [
 ];
 const tagOptions = ['venda_rapida', 'upsell', 'reclamacao', 'cancelamento', 'retencao', 'novo_cliente'];
 
-export const mockFeedbacks: CallFeedback[] = Array.from({ length: 80 }, (_, i) => {
-  const seller = mockUsers.filter(u => u.role === 'seller')[Math.floor(Math.random() * 6)];
+export const mockFeedbacks: CallFeedback[] = Array.from({ length: 250 }, (_, i) => {
+  const seller = sellerUsers[Math.floor(Math.random() * sellerCount)];
   return {
     id: `f${i}`,
     sellerId: seller.id,
     sellerName: seller.name,
     date: randomDate(30),
     summary: `Ligação de ${Math.floor(Math.random() * 10) + 3} minutos. Cliente interessado em plano ${plans[Math.floor(Math.random() * 5)]}. ${Math.random() > 0.4 ? 'Venda concluída com sucesso.' : 'Cliente pediu para retornar.'}`,
-    strengths: strengthOptions.sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 3) + 1),
-    weaknesses: weaknessOptions.sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 2) + 1),
+    strengths: [...strengthOptions].sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 3) + 1),
+    weaknesses: [...weaknessOptions].sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 2) + 1),
     tone: (['positive', 'neutral', 'negative'] as const)[Math.floor(Math.random() * 3)],
-    tags: tagOptions.sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 3) + 1),
+    tags: [...tagOptions].sort(() => Math.random() - 0.5).slice(0, Math.floor(Math.random() * 3) + 1),
     score: Math.floor(Math.random() * 40) + 60,
   };
 });
 
-export const mockIdleLogs: IdleLog[] = mockUsers
-  .filter(u => u.role === 'seller')
-  .map(u => ({
-    sellerId: u.id,
-    sellerName: u.name,
-    date: new Date().toISOString().split('T')[0],
-    totalIdleMinutes: Math.floor(Math.random() * 120) + 10,
-    idlePeriods: Math.floor(Math.random() * 8) + 1,
-    daysSinceLastSale: Math.floor(Math.random() * 5),
-  }));
+export const mockIdleLogs: IdleLog[] = sellerUsers.map(u => ({
+  sellerId: u.id,
+  sellerName: u.name,
+  date: new Date().toISOString().split('T')[0],
+  totalIdleMinutes: Math.floor(Math.random() * 120) + 10,
+  idlePeriods: Math.floor(Math.random() * 8) + 1,
+  daysSinceLastSale: Math.floor(Math.random() * 5),
+}));
 
 // Computed metrics
 export function getSalesBySeller(sellerId: string) {
@@ -126,8 +142,7 @@ export function getSalesBySeller(sellerId: string) {
 }
 
 export function getSellerRanking() {
-  const sellers = mockUsers.filter(u => u.role === 'seller');
-  return sellers
+  return sellerUsers
     .map(s => ({
       ...s,
       totalSales: mockSales.filter(sale => sale.sellerId === s.id).length,
@@ -166,7 +181,6 @@ export function getSellerPosition(sellerId: string): number {
   return ranking.findIndex(r => r.id === sellerId) + 1;
 }
 
-// Weekly sales by period for line chart
 export function getSalesByWeekAndPeriod() {
   const now = new Date();
   const currentMonth = now.getMonth();
@@ -177,8 +191,7 @@ export function getSalesByWeekAndPeriod() {
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   });
 
-  const weeks = [1, 2, 3, 4];
-  return weeks.map(week => {
+  return [1, 2, 3, 4].map(week => {
     const weekSales = currentMonthSales.filter(s => s.week === week);
     return {
       name: `Semana ${week}`,
@@ -189,7 +202,6 @@ export function getSalesByWeekAndPeriod() {
   });
 }
 
-// AI metrics mock data
 export function getAIMetrics() {
   const totalAnalyses = mockFeedbacks.length;
   const errorRate = 2.3;
@@ -199,10 +211,10 @@ export function getAIMetrics() {
   })).sort((a, b) => b.count - a.count);
 
   const recentFailures = [
-    { id: 'ai1', date: '2026-02-12', type: 'Timeout', message: 'Resposta da IA excedeu 30s', endpoint: '/api/ai-feedback' },
-    { id: 'ai2', date: '2026-02-11', type: 'Parse Error', message: 'Formato de resposta inválido', endpoint: '/api/ai-feedback' },
-    { id: 'ai3', date: '2026-02-10', type: 'Rate Limit', message: 'Limite de requisições atingido', endpoint: '/api/ai-feedback' },
-    { id: 'ai4', date: '2026-02-09', type: 'Timeout', message: 'Conexão com modelo perdida', endpoint: '/api/ai-analysis' },
+    { id: 'ai1', date: '2026-03-20', type: 'Timeout', message: 'Resposta da IA excedeu 30s', endpoint: '/api/ai-feedback' },
+    { id: 'ai2', date: '2026-03-19', type: 'Parse Error', message: 'Formato de resposta inválido', endpoint: '/api/ai-feedback' },
+    { id: 'ai3', date: '2026-03-18', type: 'Rate Limit', message: 'Limite de requisições atingido', endpoint: '/api/ai-feedback' },
+    { id: 'ai4', date: '2026-03-17', type: 'Timeout', message: 'Conexão com modelo perdida', endpoint: '/api/ai-analysis' },
   ];
 
   return { totalAnalyses, errorRate, tagDistribution, recentFailures };
