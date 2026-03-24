@@ -18,12 +18,16 @@ const COLORS = [
   "hsl(210, 60%, 50%)",
 ];
 
-const tooltipStyle = {
+const tooltipStyle: React.CSSProperties = {
   backgroundColor: "hsl(220, 18%, 10%)",
   border: "1px solid hsl(220, 14%, 18%)",
   borderRadius: "8px",
   color: "hsl(210, 20%, 92%)",
   fontSize: "12px",
+};
+
+const tooltipItemStyle: React.CSSProperties = {
+  color: "hsl(210, 20%, 92%)",
 };
 
 export function SalesBarChart({ data, label }: { data: ChartData[]; label: string }) {
@@ -64,7 +68,7 @@ export function ProductPieChart({ data }: { data: ChartData[] }) {
               <Cell key={i} fill={COLORS[i % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip contentStyle={tooltipStyle} />
+          <Tooltip contentStyle={tooltipStyle} itemStyle={tooltipItemStyle} />
         </PieChart>
       </ResponsiveContainer>
       <div className="flex flex-wrap gap-3 mt-2 justify-center">
