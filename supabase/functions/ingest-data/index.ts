@@ -28,8 +28,11 @@ Deno.serve(async (req) => {
 
     const token = authHeader.replace("Bearer ", "");
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const customToken = Deno.env.get("API_INGEST_TOKEN");
 
-    if (token !== serviceRoleKey) {
+    const isAuthorized = token === serviceRoleKey || (customToken && token === customToken);
+
+    if (!isAuthorized) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
