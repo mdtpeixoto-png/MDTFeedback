@@ -13,6 +13,90 @@ Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
 https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data
 ```
 
+## Tipos Disponíveis
+
+- `usuario`: cria um usuário de acesso à plataforma e registra perfil/papel. Se o papel for `seller`, o mesmo `id` também é cadastrado em `funcionarios` para uso em `vendedor_id`.
+- `funcionario`: cadastra um funcionário/vendedor manualmente.
+- `ligacao`: cadastra uma ligação analisada com link externo de áudio.
+- `batch`: processa múltiplos itens em uma única chamada.
+
+---
+
+## POST — Criar Usuário
+
+### JSON mínimo (obrigatório)
+
+```json
+{
+  "type": "usuario",
+  "data": {
+    "email": "vendedor@empresa.com",
+    "password": "SenhaForte123!",
+    "nome_completo": "João da Silva"
+  }
+}
+```
+
+### JSON completo
+
+```json
+{
+  "type": "usuario",
+  "data": {
+    "email": "vendedor@empresa.com",
+    "password": "SenhaForte123!",
+    "nome_completo": "João da Silva",
+    "role": "seller",
+    "email_confirmado": true
+  }
+}
+```
+
+### Exemplo completo com curl
+
+```bash
+curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
+  -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "usuario",
+    "data": {
+      "email": "vendedor@empresa.com",
+      "password": "SenhaForte123!",
+      "nome_completo": "João da Silva",
+      "role": "seller",
+      "email_confirmado": true
+    }
+  }'
+```
+
+### Resposta de sucesso
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid-do-usuario",
+    "email": "vendedor@empresa.com",
+    "nome_completo": "João da Silva",
+    "role": "seller",
+    "email_confirmado": true,
+    "funcionario_id": "uuid-do-usuario"
+  }
+}
+```
+
+**Campos:**
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| email | String | **Sim** | E-mail de acesso do usuário |
+| password | String | **Sim** | Senha inicial do usuário |
+| nome_completo | String | **Sim** | Nome completo usado no perfil |
+| role | Enum | Não | Papel do usuário: `developer`, `admin` ou `seller` (padrão: `seller`) |
+| email_confirmado | Boolean | Não | Define se o usuário já sai com e-mail confirmado |
+
+> Se `role` for `seller`, use o `funcionario_id` retornado como `vendedor_id` ao cadastrar ligações.
+
 ---
 
 ## POST — Cadastrar Funcionário

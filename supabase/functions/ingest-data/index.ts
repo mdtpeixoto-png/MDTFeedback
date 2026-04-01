@@ -6,6 +6,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const APP_ROLES = ["developer", "admin", "seller"] as const;
+
+function isAppRole(value: unknown): value is (typeof APP_ROLES)[number] {
+  return typeof value === "string" && APP_ROLES.includes(value as (typeof APP_ROLES)[number]);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -48,6 +54,99 @@ Deno.serve(async (req) => {
     let result;
 
     switch (type) {
+      case "usuario": {
+        // data: { email, password, nome_completo, role?, email_confirmado? }
+        if (!data.email || !data.password || !data.nome_completo) {
+          return new Response(
+            JSON.stringify({
+              error: "Campos 'email', 'password' e 'nome_completo' são obrigatórios",
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        const role = data.role ?? "seller";
+        const emailConfirmado = data.email_confirmado === true;
+
+        if (!isAppRole(role)) {
+          return new Response(
+            JSON.stringify({
+              error: `Campo 'role' inválido. Válidos: ${APP_ROLES.join(", ")}`,
+            }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            }
+          );
+        }
+
+        const { data: createdUserData, error: createUserError } = await supabase.auth.admin.createUser({
+          email: data.email,
+          password: data.password,
+          email_confirm: emailConfirmado,
+          user_metadata: {
+            name: data.nome_completo,
+          },
+        });
+
+        if (createUserError) throw createUserError;
+
+        const authUser = createdUserData.user;
+        if (!authUser) {
+          throw new Error("Falha ao criar usuário no backend");
+        }
+
+        try {
+          const { error: profileError } = await supabase.from("profiles").upsert(
+            {
+              user_id: authUser.id,
+              name: data.nome_completo,
+              email: data.email,
+              avatar_url: null,
+              is_active: true,
+            },
+            { onConflict: "user_id" }
+          );
+
+          if (profileError) throw profileError;
+
+          const { error: roleError } = await supabase.from("user_roles").insert({
+            user_id: authUser.id,
+            role,
+          });
+
+          if (roleError) throw roleError;
+
+          if (role === "seller") {
+            const { error: funcionarioError } = await supabase.from("funcionarios").upsert(
+              {
+                id: authUser.id,
+                nome_completo: data.nome_completo,
+              },
+              { onConflict: "id" }
+            );
+
+            if (funcionarioError) throw funcionarioError;
+          }
+        } catch (error) {
+          await supabase.auth.admin.deleteUser(authUser.id);
+          throw error;
+        }
+
+        result = {
+          id: authUser.id,
+          email: authUser.email,
+          nome_completo: data.nome_completo,
+          role,
+          email_confirmado: Boolean(authUser.email_confirmed_at),
+          funcionario_id: role === "seller" ? authUser.id : null,
+        };
+        break;
+      }
+
       case "funcionario": {
         // data: { id?, nome_completo }
         if (!data.nome_completo) {
@@ -101,6 +200,13 @@ Deno.serve(async (req) => {
       }
 
       case "batch": {
+        if (!Array.isArray(data.items)) {
+          return new Response(JSON.stringify({ error: "Campo 'items' deve ser uma lista" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
         const results = [];
         for (const item of data.items) {
           const subResponse = await fetch(req.url, {
@@ -119,7 +225,7 @@ Deno.serve(async (req) => {
 
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo desconhecido: ${type}. Válidos: funcionario, ligacao, batch` }),
+          JSON.stringify({ error: `Tipo desconhecido: ${type}. Válidos: usuario, funcionario, ligacao, batch` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
