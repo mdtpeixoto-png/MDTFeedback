@@ -2,10 +2,14 @@
 
 ## Autenticação
 
-Todas as requisições devem incluir o header:
+Todas as requisições devem incluir o header com **um dos tokens válidos**:
 ```
-Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
+Authorization: Bearer <API_INGEST_TOKEN>
 ```
+
+Tokens aceitos:
+- `API_INGEST_TOKEN` — token customizado definido nos Secrets do projeto (recomendado para integrações externas como n8n)
+- `SUPABASE_SERVICE_ROLE_KEY` — chave de serviço do backend (uso interno)
 
 ## URL Base
 
