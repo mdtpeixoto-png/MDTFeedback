@@ -6,6 +6,7 @@ import RankingTable from "@/components/dashboard/RankingTable";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import AdminSellerDetail from "@/components/admin/AdminSellerDetail";
 import SettingsPage from "@/pages/SettingsPage";
+import AlertsPage from "@/pages/AlertsPage";
 import {
   mockUsers, mockSales, mockFeedbacks, mockIdleLogs,
   getSellerRanking, getSalesByProduct, getSalesByWeekAndPeriod,
