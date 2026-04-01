@@ -1,36 +1,39 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  LayoutDashboard, Users, Phone, AlertTriangle, Settings,
-  LogOut, BarChart3, Notebook, Trophy, Shield, Cog
+  LayoutDashboard, Users, Phone, Settings,
+  LogOut, BarChart3, Notebook, Shield, Cog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { User } from "@/lib/mockData";
+
+interface SidebarUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string;
+}
 
 interface SidebarProps {
-  user: User;
+  user: SidebarUser;
   onLogout: () => void;
 }
 
 const roleMenus: Record<string, { label: string; path: string; icon: ReactNode }[]> = {
   developer: [
     { label: "Dashboard", path: "/dev", icon: <LayoutDashboard className="h-4 w-4" /> },
-    { label: "Usuários", path: "/dev/users", icon: <Users className="h-4 w-4" /> },
-    { label: "Métricas IA", path: "/dev/ai-metrics", icon: <BarChart3 className="h-4 w-4" /> },
-    { label: "Riscos", path: "/dev/risks", icon: <AlertTriangle className="h-4 w-4" /> },
+    { label: "Funcionários", path: "/dev/users", icon: <Users className="h-4 w-4" /> },
     { label: "Configurações", path: "/dev/settings", icon: <Cog className="h-4 w-4" /> },
   ],
   admin: [
     { label: "Dashboard", path: "/admin", icon: <LayoutDashboard className="h-4 w-4" /> },
     { label: "Vendedores", path: "/admin/sellers", icon: <Users className="h-4 w-4" /> },
     { label: "Ligações", path: "/admin/calls", icon: <Phone className="h-4 w-4" /> },
-    { label: "Alertas", path: "/admin/alerts", icon: <AlertTriangle className="h-4 w-4" /> },
     { label: "Configurações", path: "/admin/settings", icon: <Cog className="h-4 w-4" /> },
   ],
   seller: [
     { label: "Meu Painel", path: "/seller", icon: <LayoutDashboard className="h-4 w-4" /> },
     { label: "Feedbacks", path: "/seller/feedbacks", icon: <Phone className="h-4 w-4" /> },
-    { label: "Ranking", path: "/seller/ranking", icon: <Trophy className="h-4 w-4" /> },
     { label: "Anotações", path: "/seller/notes", icon: <Notebook className="h-4 w-4" /> },
     { label: "Configurações", path: "/seller/settings", icon: <Cog className="h-4 w-4" /> },
   ],
@@ -49,7 +52,6 @@ export default function AppSidebar({ user, onLogout }: SidebarProps) {
 
   return (
     <aside className="flex flex-col w-64 h-screen bg-sidebar border-r border-sidebar-border sticky top-0 shrink-0">
-      {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
         <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary">
           <BarChart3 className="h-5 w-5 text-primary-foreground" />
@@ -60,7 +62,6 @@ export default function AppSidebar({ user, onLogout }: SidebarProps) {
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-1">
         {menu.map((item) => {
           const isActive = location.pathname === item.path;
@@ -82,7 +83,6 @@ export default function AppSidebar({ user, onLogout }: SidebarProps) {
         })}
       </nav>
 
-      {/* User */}
       <div className="px-3 py-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3 px-3 py-2">
           <div className="flex items-center justify-center h-8 w-8 rounded-full bg-secondary text-secondary-foreground text-xs font-bold">
@@ -90,9 +90,11 @@ export default function AppSidebar({ user, onLogout }: SidebarProps) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-sidebar-accent-foreground truncate">{user.name}</p>
-            <span className="inline-flex items-center gap-1 text-[10px] text-primary uppercase tracking-wider">
-              {badge.icon} {badge.label}
-            </span>
+            {badge && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-primary uppercase tracking-wider">
+                {badge.icon} {badge.label}
+              </span>
+            )}
           </div>
           <button
             onClick={onLogout}
