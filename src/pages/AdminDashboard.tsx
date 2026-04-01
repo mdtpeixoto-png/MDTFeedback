@@ -160,6 +160,11 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
           <AdminCalls />
         </DashboardLayout>
       } />
+      <Route path="alerts" element={
+        <DashboardLayout user={user} onLogout={onLogout} title="Alertas" subtitle="Alertas operacionais dos vendedores">
+          <AlertsPage />
+        </DashboardLayout>
+      } />
       <Route path="settings" element={
         <DashboardLayout user={user} onLogout={onLogout} title="Configurações" subtitle="Preferências do sistema">
           <SettingsPage />

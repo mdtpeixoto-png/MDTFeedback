@@ -119,6 +119,11 @@ export default function DevDashboard({ user, onLogout }: DevDashboardProps) {
           <DevUsers />
         </DashboardLayout>
       } />
+      <Route path="alerts" element={
+        <DashboardLayout user={user} onLogout={onLogout} title="Alertas" subtitle="Alertas operacionais dos vendedores">
+          <AlertsPage />
+        </DashboardLayout>
+      } />
       <Route path="settings" element={
         <DashboardLayout user={user} onLogout={onLogout} title="Configurações" subtitle="Preferências do sistema">
           <SettingsPage />
