@@ -64,7 +64,22 @@ Deno.serve(async (req) => {
 
     let result;
 
+    console.log("Processing request - type:", type);
+
     switch (type) {
+      case "delete_auth_user": {
+        if (!data.user_id) {
+          return new Response(JSON.stringify({ error: "Campo 'user_id' é obrigatório" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        const { error: deleteError } = await supabase.auth.admin.deleteUser(data.user_id);
+        if (deleteError) throw deleteError;
+        result = { deleted: data.user_id };
+        break;
+      }
+
       case "usuario": {
         // data: { email, password, nome_completo, role?, email_confirmado? }
         if (!data.email || !data.password || !data.nome_completo) {
@@ -246,6 +261,7 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
+    console.error("Edge function error:", err.message, err.stack || err);
     return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
