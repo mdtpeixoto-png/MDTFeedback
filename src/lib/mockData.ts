@@ -75,7 +75,13 @@ const periods: Sale['period'][] = ['morning', 'afternoon', 'evening'];
 
 function randomDate(daysBack: number): string {
   const d = new Date();
-  d.setDate(d.getDate() - Math.floor(Math.random() * daysBack));
+  // Ensure ~60% of dates fall in the current month
+  if (Math.random() < 0.6) {
+    const currentDay = d.getDate();
+    d.setDate(Math.floor(Math.random() * currentDay) + 1);
+  } else {
+    d.setDate(d.getDate() - Math.floor(Math.random() * daysBack) - 1);
+  }
   return d.toISOString().split('T')[0];
 }
 
