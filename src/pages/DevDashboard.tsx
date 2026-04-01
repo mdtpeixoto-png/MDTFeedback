@@ -12,6 +12,7 @@ import {
 import { type AppUser } from "@/contexts/AuthContext";
 import { Database, Users, Phone, BarChart3, TrendingUp, Activity } from "lucide-react";
 import SettingsPage from "@/pages/SettingsPage";
+import AlertsPage from "@/pages/AlertsPage";
 
 interface DevDashboardProps {
   user: AppUser;
