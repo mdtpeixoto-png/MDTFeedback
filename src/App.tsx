@@ -13,7 +13,15 @@ import SellerDashboard from "./pages/SellerDashboard";
 import DevDashboard from "./pages/DevDashboard";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 function AppRoutes() {
   const { user, loading } = useAuth();

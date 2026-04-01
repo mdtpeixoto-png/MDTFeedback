@@ -6,6 +6,7 @@ import RankingTable from "@/components/dashboard/RankingTable";
 import AlertPanel from "@/components/dashboard/AlertPanel";
 import AdminSellerDetail from "@/components/admin/AdminSellerDetail";
 import SettingsPage from "@/pages/SettingsPage";
+import AlertsPage from "@/pages/AlertsPage";
 import {
   mockUsers, mockSales, mockFeedbacks, mockIdleLogs,
   getSellerRanking, getSalesByProduct, getSalesByWeekAndPeriod,
@@ -157,6 +158,11 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
       <Route path="calls" element={
         <DashboardLayout user={user} onLogout={onLogout} title="Ligações" subtitle="Todas as ligações analisadas">
           <AdminCalls />
+        </DashboardLayout>
+      } />
+      <Route path="alerts" element={
+        <DashboardLayout user={user} onLogout={onLogout} title="Alertas" subtitle="Alertas operacionais dos vendedores">
+          <AlertsPage />
         </DashboardLayout>
       } />
       <Route path="settings" element={

@@ -12,6 +12,7 @@ import {
 import { type AppUser } from "@/contexts/AuthContext";
 import { Database, Users, Phone, BarChart3, TrendingUp, Activity } from "lucide-react";
 import SettingsPage from "@/pages/SettingsPage";
+import AlertsPage from "@/pages/AlertsPage";
 
 interface DevDashboardProps {
   user: AppUser;
@@ -116,6 +117,11 @@ export default function DevDashboard({ user, onLogout }: DevDashboardProps) {
       <Route path="users" element={
         <DashboardLayout user={user} onLogout={onLogout} title="Funcionários" subtitle="Gestão de funcionários do sistema">
           <DevUsers />
+        </DashboardLayout>
+      } />
+      <Route path="alerts" element={
+        <DashboardLayout user={user} onLogout={onLogout} title="Alertas" subtitle="Alertas operacionais dos vendedores">
+          <AlertsPage />
         </DashboardLayout>
       } />
       <Route path="settings" element={
