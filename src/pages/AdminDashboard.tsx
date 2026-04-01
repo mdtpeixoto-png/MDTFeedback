@@ -1,19 +1,13 @@
 import { Routes, Route, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import MetricCard from "@/components/dashboard/MetricCard";
-import { SalesLineChart, ProductPieChart } from "@/components/dashboard/Charts";
-import RankingTable from "@/components/dashboard/RankingTable";
-import AlertPanel from "@/components/dashboard/AlertPanel";
 import AdminSellerDetail from "@/components/admin/AdminSellerDetail";
 import SettingsPage from "@/pages/SettingsPage";
-import {
-  mockUsers, mockSales, mockFeedbacks, mockIdleLogs,
-  getSellerRanking, getSalesByProduct, getSalesByWeekAndPeriod,
-} from "@/lib/mockData";
+import DownloadButton from "@/components/shared/DownloadButton";
+import { useFuncionarios, useLigacoes } from "@/hooks/useFuncionarios";
 import { type AppUser } from "@/contexts/AuthContext";
-import { DollarSign, TrendingUp, Users, ShoppingCart, Phone } from "lucide-react";
+import { Users, Phone, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { cn } from "@/lib/utils";
 
 interface AdminDashboardProps {
   user: AppUser;
@@ -21,36 +15,66 @@ interface AdminDashboardProps {
 }
 
 function AdminHome() {
-  const sellers = mockUsers.filter(u => u.role === 'seller');
-  const ranking = getSellerRanking();
-  const byProduct = getSalesByProduct().map(p => ({ name: p.product, value: p.count }));
-  const weeklyData = getSalesByWeekAndPeriod();
-  const totalValue = mockSales.reduce((s, v) => s + v.value, 0);
+  const { data: funcionarios = [] } = useFuncionarios();
+  const { data: ligacoes = [] } = useLigacoes();
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard label="Total de Vendas" value={mockSales.length} icon={<ShoppingCart className="h-5 w-5" />} />
-        <MetricCard label="Receita Total" value={`R$ ${totalValue.toLocaleString()}`} icon={<DollarSign className="h-5 w-5" />} />
-        <MetricCard label="Vendedores Ativos" value={sellers.length} icon={<Users className="h-5 w-5" />} />
-        <MetricCard label="Média/Vendedor" value={sellers.length ? Math.round(mockSales.length / sellers.length) : 0} icon={<TrendingUp className="h-5 w-5" />} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <MetricCard label="Funcionários" value={funcionarios.length} icon={<Users className="h-5 w-5" />} />
+        <MetricCard label="Ligações" value={ligacoes.length} icon={<Phone className="h-5 w-5" />} />
+        <MetricCard label="Média/Funcionário" value={funcionarios.length ? Math.round(ligacoes.length / funcionarios.length) : 0} icon={<BarChart3 className="h-5 w-5" />} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <div className="lg:col-span-2">
-          <SalesLineChart data={weeklyData} label="Vendas do Mês Atual (por período)" />
+      <div className="glass-card overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center gap-2">
+          <Phone className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">Ligações Recentes</h3>
+          <span className="ml-auto text-xs text-muted-foreground">{ligacoes.length} total</span>
         </div>
-        <ProductPieChart data={byProduct} />
+        <div className="divide-y divide-border">
+          {ligacoes.length === 0 && (
+            <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhuma ligação registrada</div>
+          )}
+          {ligacoes.slice(0, 10).map(lig => {
+            const func = funcionarios.find(f => f.id === lig.vendedor_id);
+            return (
+              <div key={lig.id} className="p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-medium text-foreground">{func?.nome_completo ?? "—"}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{new Date(lig.created_at).toLocaleDateString("pt-BR")}</span>
+                    <DownloadButton url={lig.url_audio} />
+                  </div>
+                </div>
+                {lig.resumo && <p className="text-sm text-muted-foreground mb-2">{lig.resumo}</p>}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {lig.pontos_bons && (
+                    <div>
+                      <h5 className="text-xs font-semibold text-success mb-1">Pontos Bons</h5>
+                      <p className="text-xs text-foreground">{lig.pontos_bons}</p>
+                    </div>
+                  )}
+                  {lig.pontos_ruins && (
+                    <div>
+                      <h5 className="text-xs font-semibold text-warning mb-1">Pontos Ruins</h5>
+                      <p className="text-xs text-foreground">{lig.pontos_ruins}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
-
-      <RankingTable data={ranking.map(r => ({ id: r.id, name: r.name, totalSales: r.totalSales, totalValue: r.totalValue }))} />
     </>
   );
 }
 
 function AdminSellers() {
   const navigate = useNavigate();
-  const sellers = mockUsers.filter(u => u.role === 'seller');
+  const { data: funcionarios = [] } = useFuncionarios();
+  const { data: ligacoes = [] } = useLigacoes();
 
   return (
     <div className="glass-card overflow-hidden">
@@ -63,32 +87,21 @@ function AdminSellers() {
           <thead>
             <tr className="border-b border-border">
               <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 uppercase tracking-wider">Nome</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3 uppercase tracking-wider">Email</th>
-              <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 uppercase tracking-wider">Vendas</th>
-              <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 uppercase tracking-wider">Dias s/ Venda</th>
+              <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3 uppercase tracking-wider">Ligações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {sellers.map(s => {
-              const salesCount = mockSales.filter(sale => sale.sellerId === s.id).length;
-              const idle = mockIdleLogs.find(l => l.sellerId === s.id);
+            {funcionarios.length === 0 && (
+              <tr><td colSpan={2} className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhum funcionário cadastrado</td></tr>
+            )}
+            {funcionarios.map(f => {
+              const count = ligacoes.filter(l => l.vendedor_id === f.id).length;
               return (
-                <tr key={s.id} className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => navigate(`/admin/sellers/${s.id}`)}>
+                <tr key={f.id} className="hover:bg-secondary/30 transition-colors cursor-pointer" onClick={() => navigate(`/admin/sellers/${f.id}`)}>
                   <td className="px-5 py-3 text-sm font-medium">
-                    <Link to={`/admin/sellers/${s.id}`} className="text-primary hover:underline">{s.name}</Link>
+                    <Link to={`/admin/sellers/${f.id}`} className="text-primary hover:underline">{f.nome_completo}</Link>
                   </td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground font-mono">{s.email}</td>
-                  <td className="px-5 py-3 text-sm text-right font-mono text-foreground">{salesCount}</td>
-                  <td className="px-5 py-3 text-sm text-right">
-                    <span className={cn(
-                      "font-mono text-xs px-2 py-0.5 rounded-full",
-                      (idle?.daysSinceLastSale || 0) >= 3 ? "bg-destructive/10 text-destructive" :
-                      (idle?.daysSinceLastSale || 0) >= 1 ? "bg-warning/10 text-warning" :
-                      "bg-success/10 text-success"
-                    )}>
-                      {idle?.daysSinceLastSale ?? 0}d
-                    </span>
-                  </td>
+                  <td className="px-5 py-3 text-sm text-right font-mono text-foreground">{count}</td>
                 </tr>
               );
             })}
@@ -100,48 +113,57 @@ function AdminSellers() {
 }
 
 function AdminCalls() {
-  const recentFeedbacks = mockFeedbacks.slice(0, 20);
+  const { data: funcionarios = [] } = useFuncionarios();
+  const { data: ligacoes = [] } = useLigacoes();
 
   return (
     <div className="space-y-3">
       <div className="glass-card px-5 py-4 flex items-center gap-2">
         <Phone className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold text-foreground">Ligações Recentes</h3>
-        <span className="ml-auto text-xs text-muted-foreground">{mockFeedbacks.length} total</span>
+        <h3 className="text-sm font-semibold text-foreground">Todas as Ligações</h3>
+        <span className="ml-auto text-xs text-muted-foreground">{ligacoes.length} total</span>
       </div>
-      {recentFeedbacks.map(fb => (
-        <div key={fb.id} className="glass-card p-5">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-muted-foreground">{new Date(fb.date).toLocaleDateString("pt-BR")}</span>
-            <div className="flex items-center gap-2">
-              <span className={cn(
-                "text-xs font-medium px-2 py-0.5 rounded-full",
-                fb.tone === 'positive' ? "bg-success/10 text-success" :
-                fb.tone === 'negative' ? "bg-destructive/10 text-destructive" :
-                "bg-muted text-muted-foreground"
-              )}>
-                {fb.tone === 'positive' ? 'Positivo' : fb.tone === 'negative' ? 'Negativo' : 'Neutro'}
-              </span>
-              <span className="text-xs font-bold text-primary">{fb.score}/100</span>
+      {ligacoes.length === 0 && (
+        <div className="glass-card p-5 text-center text-sm text-muted-foreground">Nenhuma ligação registrada</div>
+      )}
+      {ligacoes.map(lig => {
+        const func = funcionarios.find(f => f.id === lig.vendedor_id);
+        return (
+          <div key={lig.id} className="glass-card p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-foreground">{func?.nome_completo ?? "—"}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{new Date(lig.created_at).toLocaleDateString("pt-BR")}</span>
+                <DownloadButton url={lig.url_audio} />
+              </div>
+            </div>
+            {lig.resumo && <p className="text-sm text-muted-foreground mb-2">{lig.resumo}</p>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {lig.pontos_bons && (
+                <div>
+                  <h5 className="text-xs font-semibold text-success mb-1">Pontos Bons</h5>
+                  <p className="text-xs text-foreground">{lig.pontos_bons}</p>
+                </div>
+              )}
+              {lig.pontos_ruins && (
+                <div>
+                  <h5 className="text-xs font-semibold text-warning mb-1">Pontos Ruins</h5>
+                  <p className="text-xs text-foreground">{lig.pontos_ruins}</p>
+                </div>
+              )}
             </div>
           </div>
-          <p className="text-sm text-muted-foreground mb-1"><span className="font-medium text-foreground">{fb.sellerName}</span></p>
-          <p className="text-sm text-muted-foreground">{fb.summary}</p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
-}
-
-function AdminAlerts() {
-  return <AlertPanel idleLogs={mockIdleLogs} />;
 }
 
 export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   return (
     <Routes>
       <Route index element={
-        <DashboardLayout user={user} onLogout={onLogout} title="Dashboard" subtitle="Visão geral da operação de vendas">
+        <DashboardLayout user={user} onLogout={onLogout} title="Dashboard" subtitle="Visão geral da operação">
           <AdminHome />
         </DashboardLayout>
       } />
@@ -156,13 +178,8 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
         </DashboardLayout>
       } />
       <Route path="calls" element={
-        <DashboardLayout user={user} onLogout={onLogout} title="Ligações" subtitle="Feedbacks de ligações analisadas">
+        <DashboardLayout user={user} onLogout={onLogout} title="Ligações" subtitle="Todas as ligações analisadas">
           <AdminCalls />
-        </DashboardLayout>
-      } />
-      <Route path="alerts" element={
-        <DashboardLayout user={user} onLogout={onLogout} title="Alertas" subtitle="Riscos operacionais">
-          <AdminAlerts />
         </DashboardLayout>
       } />
       <Route path="settings" element={
