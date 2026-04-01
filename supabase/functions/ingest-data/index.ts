@@ -30,7 +30,9 @@ Deno.serve(async (req) => {
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const customToken = Deno.env.get("API_INGEST_TOKEN");
 
-    const isAuthorized = token === serviceRoleKey || (customToken && token === customToken);
+    console.log("Auth check - serviceRoleKey exists:", !!serviceRoleKey, "customToken exists:", !!customToken);
+
+    const isAuthorized = (serviceRoleKey && token === serviceRoleKey) || (customToken && token === customToken);
 
     if (!isAuthorized) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -40,7 +42,13 @@ Deno.serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey!, {
+    if (!serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Server configuration error: missing service role key" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
