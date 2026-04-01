@@ -1,0 +1,96 @@
+# API de Ingestão de Dados — MDTFeedback
+
+## Autenticação
+
+Todas as requisições devem incluir o header:
+```
+Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
+```
+
+## URL Base
+
+```
+https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data
+```
+
+---
+
+## POST — Cadastrar Funcionário
+
+```json
+{
+  "type": "funcionario",
+  "data": {
+    "id": "uuid-opcional",
+    "nome_completo": "João da Silva"
+  }
+}
+```
+
+**Campos:**
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| id | UUID | Não | ID do funcionário (gerado automaticamente se não informado) |
+| nome_completo | String | **Sim** | Nome completo do funcionário |
+
+---
+
+## POST — Cadastrar Ligação
+
+```json
+{
+  "type": "ligacao",
+  "data": {
+    "id": "uuid-opcional",
+    "vendedor_id": "uuid-do-funcionario",
+    "pontos_bons": "Boa entonação, conhecimento do produto...",
+    "pontos_ruins": "Faltou empatia, não ofereceu alternativas...",
+    "resumo": "Ligação de 5 minutos sobre plano premium...",
+    "url_audio": "https://exemplo.com/audio/ligacao-123.mp3"
+  }
+}
+```
+
+**Campos:**
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| id | UUID | Não | ID da ligação (gerado automaticamente se não informado) |
+| vendedor_id | UUID | **Sim** | ID do funcionário (deve existir na tabela funcionarios) |
+| pontos_bons | Text | Não | Pontos positivos identificados na ligação |
+| pontos_ruins | Text | Não | Pontos negativos identificados na ligação |
+| resumo | Text | Não | Resumo da ligação |
+| url_audio | URL | Não | Link externo para download do áudio da ligação |
+
+---
+
+## POST — Batch (Lote)
+
+```json
+{
+  "type": "batch",
+  "data": {
+    "items": [
+      { "type": "funcionario", "data": { "nome_completo": "Maria Santos" } },
+      { "type": "ligacao", "data": { "vendedor_id": "...", "resumo": "..." } }
+    ]
+  }
+}
+```
+
+---
+
+## Exemplo com curl
+
+```bash
+# Cadastrar funcionário
+curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
+  -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"funcionario","data":{"nome_completo":"João da Silva"}}'
+
+# Cadastrar ligação
+curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
+  -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"ligacao","data":{"vendedor_id":"UUID_DO_FUNCIONARIO","pontos_bons":"Boa comunicação","pontos_ruins":"Faltou fechamento","resumo":"Ligação sobre plano básico","url_audio":"https://exemplo.com/audio.mp3"}}'
+```
