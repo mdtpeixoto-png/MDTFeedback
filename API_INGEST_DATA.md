@@ -17,12 +17,52 @@ https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data
 
 ## POST — Cadastrar Funcionário
 
+### JSON mínimo (obrigatório)
+
 ```json
 {
   "type": "funcionario",
   "data": {
-    "id": "uuid-opcional",
     "nome_completo": "João da Silva"
+  }
+}
+```
+
+### JSON completo (com ID personalizado)
+
+```json
+{
+  "type": "funcionario",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "nome_completo": "João da Silva"
+  }
+}
+```
+
+### Exemplo completo com curl
+
+```bash
+curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
+  -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "funcionario",
+    "data": {
+      "nome_completo": "João da Silva"
+    }
+  }'
+```
+
+### Resposta de sucesso
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid-gerado-automaticamente",
+    "nome_completo": "João da Silva",
+    "created_at": "2026-04-01T12:00:00.000Z"
   }
 }
 ```
