@@ -141,6 +141,24 @@ export type Database = {
         }
         Relationships: []
       }
+      funcionarios: {
+        Row: {
+          created_at: string
+          id: string
+          nome_completo: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          nome_completo: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          nome_completo?: string
+        }
+        Relationships: []
+      }
       idle_time_logs: {
         Row: {
           created_at: string
@@ -170,6 +188,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      ligacoes: {
+        Row: {
+          created_at: string
+          id: string
+          pontos_bons: string | null
+          pontos_ruins: string | null
+          resumo: string | null
+          url_audio: string | null
+          vendedor_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pontos_bons?: string | null
+          pontos_ruins?: string | null
+          resumo?: string | null
+          url_audio?: string | null
+          vendedor_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pontos_bons?: string | null
+          pontos_ruins?: string | null
+          resumo?: string | null
+          url_audio?: string | null
+          vendedor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ligacoes_vendedor_id_fkey"
+            columns: ["vendedor_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notebook_pages: {
         Row: {

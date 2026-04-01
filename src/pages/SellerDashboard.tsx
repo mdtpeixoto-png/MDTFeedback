@@ -2,14 +2,11 @@ import { Routes, Route } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import MetricCard from "@/components/dashboard/MetricCard";
 import NotebookSystem from "@/components/seller/NotebookSystem";
-import {
-  mockUsers, mockSales, mockFeedbacks, mockIdleLogs,
-  getSellerRanking, getSalesBySeller, getSellerPosition,
-} from "@/lib/mockData";
+import DownloadButton from "@/components/shared/DownloadButton";
+import { useLigacoes } from "@/hooks/useFuncionarios";
 import { type AppUser } from "@/contexts/AuthContext";
 import SettingsPage from "@/pages/SettingsPage";
-import { ShoppingCart, Trophy, Phone, Clock, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Phone, BarChart3 } from "lucide-react";
 
 interface SellerDashboardProps {
   user: AppUser;
@@ -17,162 +14,77 @@ interface SellerDashboardProps {
 }
 
 function SellerOverview({ user }: { user: AppUser }) {
-  const mySales = getSalesBySeller(user.id);
-  const ranking = getSellerRanking();
-  const position = getSellerPosition(user.id);
-  const totalSellers = ranking.length;
-  const myFeedbacks = mockFeedbacks.filter(f => f.sellerId === user.id);
-  const myIdle = mockIdleLogs.find(l => l.sellerId === user.id);
-
-  const allStrengths = myFeedbacks.flatMap(f => f.strengths);
-  const allWeaknesses = myFeedbacks.flatMap(f => f.weaknesses);
-
-  const strengthCounts = Object.entries(
-    allStrengths.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]);
-
-  const weaknessCounts = Object.entries(
-    allWeaknesses.reduce((a, s) => ({ ...a, [s]: (a[s] || 0) + 1 }), {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]);
+  const { data: ligacoes = [] } = useLigacoes(user.id);
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <MetricCard label="Minhas Vendas" value={mySales.length} icon={<ShoppingCart className="h-5 w-5" />} />
-        <MetricCard label="Posição no Ranking" value={position > 0 ? `${position}º de ${totalSellers}` : "—"} icon={<Trophy className="h-5 w-5" />} />
-        <MetricCard label="Ligações Analisadas" value={myFeedbacks.length} icon={<Phone className="h-5 w-5" />} />
-        <MetricCard label="Tempo Ocioso Hoje" value={`${myIdle?.totalIdleMinutes || 0}min`} icon={<Clock className="h-5 w-5" />} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <MetricCard label="Minhas Ligações" value={ligacoes.length} icon={<Phone className="h-5 w-5" />} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Pontos Fortes</h3>
-          <div className="space-y-2">
-            {strengthCounts.length === 0 && <p className="text-sm text-muted-foreground">Sem dados ainda</p>}
-            {strengthCounts.slice(0, 5).map(([s, count]) => (
-              <div key={s} className="flex items-center justify-between">
-                <span className="text-sm text-foreground">{s}</span>
-                <span className="text-xs font-mono text-success bg-success/10 px-2 py-0.5 rounded-full">{count}x</span>
-              </div>
-            ))}
+      <div className="space-y-3">
+        {ligacoes.length === 0 && (
+          <div className="glass-card p-5 text-center text-sm text-muted-foreground">Nenhuma ligação disponível ainda</div>
+        )}
+        {ligacoes.slice(0, 10).map(lig => (
+          <div key={lig.id} className="glass-card p-5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-muted-foreground">{new Date(lig.created_at).toLocaleDateString("pt-BR")}</span>
+              <DownloadButton url={lig.url_audio} />
+            </div>
+            {lig.resumo && <p className="text-sm text-foreground mb-3">{lig.resumo}</p>}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {lig.pontos_bons && (
+                <div>
+                  <h5 className="text-xs font-semibold text-success mb-1">Pontos Bons</h5>
+                  <p className="text-xs text-foreground">{lig.pontos_bons}</p>
+                </div>
+              )}
+              {lig.pontos_ruins && (
+                <div>
+                  <h5 className="text-xs font-semibold text-warning mb-1">Pontos Ruins</h5>
+                  <p className="text-xs text-foreground">{lig.pontos_ruins}</p>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-        <div className="glass-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-3">Pontos a Melhorar</h3>
-          <div className="space-y-2">
-            {weaknessCounts.length === 0 && <p className="text-sm text-muted-foreground">Sem dados ainda</p>}
-            {weaknessCounts.slice(0, 5).map(([s, count]) => (
-              <div key={s} className="flex items-center justify-between">
-                <span className="text-sm text-foreground">{s}</span>
-                <span className="text-xs font-mono text-warning bg-warning/10 px-2 py-0.5 rounded-full">{count}x</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
     </>
   );
 }
 
 function SellerFeedbacks({ user }: { user: AppUser }) {
-  const myFeedbacks = mockFeedbacks.filter(f => f.sellerId === user.id);
+  const { data: ligacoes = [] } = useLigacoes(user.id);
 
   return (
     <div className="space-y-3">
-      {myFeedbacks.length === 0 && (
-        <div className="glass-card p-5 text-center text-sm text-muted-foreground">Nenhum feedback disponível ainda</div>
+      {ligacoes.length === 0 && (
+        <div className="glass-card p-5 text-center text-sm text-muted-foreground">Nenhuma ligação disponível ainda</div>
       )}
-      {myFeedbacks.map(fb => (
-        <div key={fb.id} className="glass-card p-5">
+      {ligacoes.map(lig => (
+        <div key={lig.id} className="glass-card p-5">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-muted-foreground">{new Date(fb.date).toLocaleDateString("pt-BR")}</span>
-            <div className="flex items-center gap-2">
-              <span className={cn(
-                "text-xs font-medium px-2 py-0.5 rounded-full",
-                fb.tone === 'positive' ? "bg-success/10 text-success" :
-                fb.tone === 'negative' ? "bg-destructive/10 text-destructive" :
-                "bg-muted text-muted-foreground"
-              )}>
-                {fb.tone === 'positive' ? 'Positivo' : fb.tone === 'negative' ? 'Negativo' : 'Neutro'}
-              </span>
-              <span className="text-xs font-bold text-primary">{fb.score}/100</span>
-            </div>
+            <span className="text-xs text-muted-foreground">{new Date(lig.created_at).toLocaleDateString("pt-BR")}</span>
+            <DownloadButton url={lig.url_audio} />
           </div>
-          <p className="text-sm text-foreground mb-3">{fb.summary}</p>
+          {lig.resumo && <p className="text-sm text-foreground mb-3">{lig.resumo}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <h4 className="text-xs font-semibold text-success mb-1.5">Pontos Fortes</h4>
-              <ul className="space-y-1">
-                {fb.strengths.map(s => (
-                  <li key={s} className="text-xs text-foreground flex items-center gap-1.5">
-                    <span className="h-1 w-1 rounded-full bg-success" />{s}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-warning mb-1.5">Pontos a Melhorar</h4>
-              <ul className="space-y-1">
-                {fb.weaknesses.map(w => (
-                  <li key={w} className="text-xs text-foreground flex items-center gap-1.5">
-                    <span className="h-1 w-1 rounded-full bg-warning" />{w}
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {lig.pontos_bons && (
+              <div>
+                <h5 className="text-xs font-semibold text-success mb-1.5">Pontos Bons</h5>
+                <p className="text-xs text-foreground">{lig.pontos_bons}</p>
+              </div>
+            )}
+            {lig.pontos_ruins && (
+              <div>
+                <h5 className="text-xs font-semibold text-warning mb-1.5">Pontos Ruins</h5>
+                <p className="text-xs text-foreground">{lig.pontos_ruins}</p>
+              </div>
+            )}
           </div>
         </div>
       ))}
-    </div>
-  );
-}
-
-function SellerRanking({ user }: { user: AppUser }) {
-  const ranking = getSellerRanking();
-  const position = getSellerPosition(user.id);
-  const totalSellers = ranking.length;
-
-  return (
-    <div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <MetricCard label="Posição Atual" value={position > 0 ? `${position}º` : "—"} icon={<Trophy className="h-5 w-5" />} />
-        <MetricCard label="Total de Vendedores" value={totalSellers} icon={<TrendingUp className="h-5 w-5" />} />
-      </div>
-
-      <div className="glass-card overflow-hidden mb-6">
-        <div className="px-5 py-4 border-b border-border">
-          <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-            <Trophy className="h-4 w-4 text-warning" />
-            Ranking Geral
-          </h3>
-        </div>
-        <div className="divide-y divide-border">
-          {ranking.map((seller, index) => (
-            <div
-              key={seller.id}
-              className={cn(
-                "flex items-center gap-4 px-5 py-3 transition-colors",
-                seller.id === user.id && "bg-primary/5 border-l-2 border-l-primary"
-              )}
-            >
-              <span className={cn(
-                "flex items-center justify-center h-7 w-7 rounded-full text-xs font-bold",
-                index === 0 ? "bg-warning/20 text-warning" :
-                index === 1 ? "bg-muted text-muted-foreground" :
-                index === 2 ? "bg-warning/10 text-warning/70" :
-                "bg-secondary text-secondary-foreground"
-              )}>
-                {index + 1}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {seller.id === user.id ? `${seller.name} (Você)` : seller.name}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
@@ -188,11 +100,6 @@ export default function SellerDashboard({ user, onLogout }: SellerDashboardProps
       <Route path="feedbacks" element={
         <DashboardLayout user={user} onLogout={onLogout} title="Feedbacks" subtitle="Feedbacks das suas ligações">
           <SellerFeedbacks user={user} />
-        </DashboardLayout>
-      } />
-      <Route path="ranking" element={
-        <DashboardLayout user={user} onLogout={onLogout} title="Ranking" subtitle="Sua posição no ranking">
-          <SellerRanking user={user} />
         </DashboardLayout>
       } />
       <Route path="notes" element={

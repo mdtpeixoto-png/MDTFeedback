@@ -12,7 +12,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Authenticate via service_role key in Authorization header
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "Missing authorization header" }), {
@@ -49,107 +48,23 @@ Deno.serve(async (req) => {
     let result;
 
     switch (type) {
-      case "call": {
-        // data: { user_id, duration_seconds, had_sale, call_datetime }
-        const { error, data: inserted } = await supabase
-          .from("calls")
-          .insert({
-            user_id: data.user_id,
-            duration_seconds: data.duration_seconds ?? null,
-            had_sale: data.had_sale ?? false,
-            call_datetime: data.call_datetime ?? new Date().toISOString(),
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        result = inserted;
-        break;
-      }
-
-      case "feedback": {
-        // data: { call_id, summary, strengths, weaknesses, tone, score }
-        const { error, data: inserted } = await supabase
-          .from("ai_feedbacks")
-          .insert({
-            call_id: data.call_id,
-            summary: data.summary ?? null,
-            strengths: data.strengths ?? null,
-            weaknesses: data.weaknesses ?? null,
-            tone: data.tone ?? null,
-            score: data.score ?? null,
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        result = inserted;
-        break;
-      }
-
-      case "sale": {
-        // data: { user_id, product, plan, period, value, week, sale_date }
-        const { error, data: inserted } = await supabase
-          .from("sales")
-          .insert({
-            user_id: data.user_id,
-            product: data.product,
-            plan: data.plan ?? null,
-            period: data.period ?? null,
-            value: data.value ?? 0,
-            week: data.week ?? null,
-            sale_date: data.sale_date ?? new Date().toISOString().split("T")[0],
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        result = inserted;
-        break;
-      }
-
-      case "tags": {
-        // data: { call_id, tags: string[] }
-        // First ensure tags exist, then link to call
-        const tagNames: string[] = data.tags;
-        const callId: string = data.call_id;
-
-        for (const tagName of tagNames) {
-          // Upsert tag
-          let { data: existingTag } = await supabase
-            .from("tags")
-            .select("id")
-            .eq("name", tagName)
-            .single();
-
-          if (!existingTag) {
-            const { data: newTag, error: tagErr } = await supabase
-              .from("tags")
-              .insert({ name: tagName })
-              .select()
-              .single();
-            if (tagErr) throw tagErr;
-            existingTag = newTag;
-          }
-
-          // Link tag to call
-          await supabase
-            .from("call_tags")
-            .insert({ call_id: callId, tag_id: existingTag!.id });
+      case "funcionario": {
+        // data: { id?, nome_completo }
+        if (!data.nome_completo) {
+          return new Response(JSON.stringify({ error: "Campo 'nome_completo' é obrigatório" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
 
-        result = { call_id: callId, tags_linked: tagNames.length };
-        break;
-      }
+        const insertData: Record<string, unknown> = {
+          nome_completo: data.nome_completo,
+        };
+        if (data.id) insertData.id = data.id;
 
-      case "idle_log": {
-        // data: { user_id, start_time, end_time, duration_seconds, days_since_last_sale }
         const { error, data: inserted } = await supabase
-          .from("idle_time_logs")
-          .insert({
-            user_id: data.user_id,
-            start_time: data.start_time,
-            end_time: data.end_time ?? null,
-            duration_seconds: data.duration_seconds ?? null,
-            days_since_last_sale: data.days_since_last_sale ?? 0,
-          })
+          .from("funcionarios")
+          .insert(insertData)
           .select()
           .single();
         if (error) throw error;
@@ -157,14 +72,27 @@ Deno.serve(async (req) => {
         break;
       }
 
-      case "ai_error": {
-        // data: { call_id, error_message }
+      case "ligacao": {
+        // data: { id?, vendedor_id, pontos_bons, pontos_ruins, resumo, url_audio }
+        if (!data.vendedor_id) {
+          return new Response(JSON.stringify({ error: "Campo 'vendedor_id' é obrigatório" }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        const insertData: Record<string, unknown> = {
+          vendedor_id: data.vendedor_id,
+          pontos_bons: data.pontos_bons ?? null,
+          pontos_ruins: data.pontos_ruins ?? null,
+          resumo: data.resumo ?? null,
+          url_audio: data.url_audio ?? null,
+        };
+        if (data.id) insertData.id = data.id;
+
         const { error, data: inserted } = await supabase
-          .from("ai_error_logs")
-          .insert({
-            call_id: data.call_id ?? null,
-            error_message: data.error_message ?? null,
-          })
+          .from("ligacoes")
+          .insert(insertData)
           .select()
           .single();
         if (error) throw error;
@@ -173,10 +101,8 @@ Deno.serve(async (req) => {
       }
 
       case "batch": {
-        // data: { items: Array<{ type, data }> }
         const results = [];
         for (const item of data.items) {
-          // Recursive-like processing for each item
           const subResponse = await fetch(req.url, {
             method: "POST",
             headers: {
@@ -193,7 +119,7 @@ Deno.serve(async (req) => {
 
       default:
         return new Response(
-          JSON.stringify({ error: `Unknown type: ${type}. Valid: call, feedback, sale, tags, idle_log, ai_error, batch` }),
+          JSON.stringify({ error: `Tipo desconhecido: ${type}. Válidos: funcionario, ligacao, batch` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
