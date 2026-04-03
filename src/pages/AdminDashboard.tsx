@@ -32,7 +32,7 @@ function AdminHome() {
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard label="Vendedores" value={sellerCount} icon={<Users className="h-5 w-5" />} />
-        <MetricCard label="Vendas Totais" value={mockSales.length} icon={<TrendingUp className="h-5 w-5" />} />
+        <MetricCard label="Receita Total" value={`R$ ${mockSales.reduce((sum, s) => sum + s.value, 0).toLocaleString('pt-BR')}`} icon={<TrendingUp className="h-5 w-5" />} />
         <MetricCard label="Feedbacks" value={mockFeedbacks.length} icon={<Phone className="h-5 w-5" />} />
         <MetricCard label="Média/Vendedor" value={sellerCount ? Math.round(mockSales.length / sellerCount) : 0} icon={<BarChart3 className="h-5 w-5" />} />
       </div>
