@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { Trophy } from "lucide-react";
 
 interface RankingItem {
-  id: string;
+  id: number | string;
   name: string;
   totalSales: number;
   totalValue: number;

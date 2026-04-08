@@ -2,7 +2,7 @@ import { AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface IdleLogSummary {
-  sellerId: string;
+  sellerId: number | string;
   sellerName: string;
   totalIdleMinutes: number;
   idlePeriods: number;
