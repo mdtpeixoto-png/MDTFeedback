@@ -1,13 +1,36 @@
 import { useState } from "react";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Switch } from "@/components/ui/switch";
-import { Sun, Moon, Settings, Upload, FileText, Check } from "lucide-react";
+import { Sun, Moon, Settings, Upload, FileText, Check, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { API_PDF_BASE64 } from "@/lib/apiPdfData";
+
+function downloadPdf() {
+  const byteChars = atob(API_PDF_BASE64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNumbers[i] = byteChars.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  const blob = new Blob([byteArray], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "API_MDTFeedback_Documentacao.pdf";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 export default function SettingsPage() {
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+
+  const isAdmin = user?.role === "admin" || user?.role === "developer";
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -24,8 +47,6 @@ export default function SettingsPage() {
     }
 
     setUploading(true);
-
-    // Simulate processing delay
     setTimeout(() => {
       setUploadedFile(file.name);
       setUploading(false);
@@ -61,6 +82,25 @@ export default function SettingsPage() {
           <Switch checked={theme === "light"} onCheckedChange={toggleTheme} />
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="glass-card p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Download className="h-5 w-5 text-primary" />
+            <h3 className="text-base font-semibold text-foreground">Documentação da API</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            Baixe a documentação técnica completa da API de ingestão de dados (feedbacks, usuários, funcionários e batch).
+          </p>
+          <button
+            onClick={downloadPdf}
+            className="flex items-center gap-2 px-4 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors w-full justify-center"
+          >
+            <Download className="h-4 w-4" />
+            <span className="text-sm font-medium">Baixar PDF — Documentação API</span>
+          </button>
+        </div>
+      )}
 
       <div className="glass-card p-6">
         <div className="flex items-center gap-3 mb-4">
