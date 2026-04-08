@@ -185,6 +185,17 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: "Campo 'id' deve ser um número inteiro positivo" }, 400);
         }
 
+        // Check if funcionario ID already exists — return 409 Conflict
+        const { data: existingFunc } = await supabase
+          .from("funcionarios")
+          .select("id")
+          .eq("id", funcId)
+          .maybeSingle();
+
+        if (existingFunc) {
+          return jsonResponse({ error: `Funcionário com id ${funcId} já está cadastrado. Use outro ID ou atualize o registro existente.` }, 409);
+        }
+
         const { user: funcAuthUser, created: createdAuthUser } = await getOrCreateAuthUser(supabase, {
           email: data.email,
           password: data.password,
@@ -193,24 +204,21 @@ Deno.serve(async (req) => {
         });
 
         try {
-          // 2. Create profile
           const { error: profileErr } = await supabase.from("profiles").upsert(
             { user_id: funcAuthUser.id, name: data.nome_completo, email: data.email, avatar_url: null, is_active: true },
             { onConflict: "user_id" }
           );
           if (profileErr) throw profileErr;
 
-          // 3. Assign seller role
           const { error: roleErr } = await supabase.from("user_roles").upsert(
             { user_id: funcAuthUser.id, role: "seller" },
             { onConflict: "user_id,role" }
           );
           if (roleErr) throw roleErr;
 
-          // 4. Create funcionario record with custom ID
           const { data: newFunc, error: funcErr } = await supabase
             .from("funcionarios")
-            .upsert({ id: funcId, nome_completo: data.nome_completo }, { onConflict: "id" })
+            .insert({ id: funcId, nome_completo: data.nome_completo })
             .select()
             .single();
           if (funcErr) throw funcErr;
@@ -223,7 +231,6 @@ Deno.serve(async (req) => {
             role: "seller",
           };
         } catch (err) {
-          // Rollback: delete auth user if any step fails
           if (createdAuthUser) {
             await supabase.auth.admin.deleteUser(funcAuthUser.id);
           }

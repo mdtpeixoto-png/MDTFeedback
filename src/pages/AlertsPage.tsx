@@ -13,10 +13,10 @@ export default function AlertsPage() {
       : null;
     const daysSinceLastSale = lastSaleDate
       ? Math.floor((Date.now() - lastSaleDate.getTime()) / (1000 * 60 * 60 * 24))
-      : 999;
+      : null;
     const hoursSinceLastSale = lastSaleDate
       ? Math.floor((Date.now() - lastSaleDate.getTime()) / (1000 * 60 * 60))
-      : 0;
+      : null;
 
     return {
       sellerId: f.id,
@@ -25,7 +25,7 @@ export default function AlertsPage() {
       hoursSinceLastSale,
       hasAnySale: sellerSales.length > 0,
     };
-  }).sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale);
+  }).sort((a, b) => (b.daysSinceLastSale ?? -1) - (a.daysSinceLastSale ?? -1));
 
   return (
     <div className="glass-card overflow-hidden">
@@ -43,6 +43,7 @@ export default function AlertsPage() {
             <span className="text-xs font-mono text-muted-foreground w-6">{index + 1}.</span>
             <div className={cn(
               "h-2.5 w-2.5 rounded-full shrink-0",
+              log.daysSinceLastSale === null ? "bg-muted-foreground" :
               log.daysSinceLastSale >= 3 ? "bg-destructive animate-pulse" :
               log.daysSinceLastSale >= 1 ? "bg-warning" :
               "bg-success"
@@ -51,7 +52,7 @@ export default function AlertsPage() {
               <p className="text-sm font-medium text-foreground">{log.sellerName}</p>
               <p className="text-xs text-muted-foreground">
                 {!log.hasAnySale
-                  ? "Nunca vendeu"
+                  ? "Nenhuma venda registrada"
                   : log.daysSinceLastSale === 0
                     ? `Vendeu hoje (${log.hoursSinceLastSale}h atrás)`
                     : `${log.daysSinceLastSale} dia(s) sem vender`}
@@ -59,7 +60,7 @@ export default function AlertsPage() {
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span>{log.hasAnySale ? `${log.hoursSinceLastSale}h` : "—"}</span>
+              <span>{log.hasAnySale ? `${log.hoursSinceLastSale}h` : "0h"}</span>
             </div>
           </div>
         ))}
