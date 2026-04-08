@@ -2,14 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Funcionario {
-  id: string;
+  id: number;
   nome_completo: string;
   created_at: string;
 }
 
 export interface Ligacao {
   id: string;
-  vendedor_id: string;
+  vendedor_id: number;
   vendedor_nome: string | null;
   lead_id: string | null;
   pontos_bons: string | null;
