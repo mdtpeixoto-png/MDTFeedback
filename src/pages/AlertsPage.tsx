@@ -1,23 +1,44 @@
 import { AlertTriangle, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mockIdleLogs } from "@/lib/mockData";
+import { useFuncionarios, useLigacoes } from "@/hooks/useFuncionarios";
 
 export default function AlertsPage() {
-  // Sort by days since last sale descending (longest without sale first)
-  const sorted = [...mockIdleLogs].sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale);
+  const { data: funcionarios = [] } = useFuncionarios();
+  const { data: ligacoes = [] } = useLigacoes();
+
+  const alerts = funcionarios.map(f => {
+    const sellerSales = ligacoes.filter(l => l.vendedor_id === f.id && l.status);
+    const lastSaleDate = sellerSales.length > 0
+      ? new Date(sellerSales.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at)
+      : null;
+    const daysSinceLastSale = lastSaleDate
+      ? Math.floor((Date.now() - lastSaleDate.getTime()) / (1000 * 60 * 60 * 24))
+      : 999;
+    const hoursSinceLastSale = lastSaleDate
+      ? Math.floor((Date.now() - lastSaleDate.getTime()) / (1000 * 60 * 60))
+      : 0;
+
+    return {
+      sellerId: f.id,
+      sellerName: f.nome_completo,
+      daysSinceLastSale,
+      hoursSinceLastSale,
+      hasAnySale: sellerSales.length > 0,
+    };
+  }).sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale);
 
   return (
     <div className="glass-card overflow-hidden">
       <div className="px-5 py-4 border-b border-border flex items-center gap-2">
         <AlertTriangle className="h-4 w-4 text-warning" />
         <h3 className="text-sm font-semibold text-foreground">Alertas Operacionais</h3>
-        <span className="ml-auto text-xs text-muted-foreground">{sorted.length} vendedores</span>
+        <span className="ml-auto text-xs text-muted-foreground">{alerts.length} vendedores</span>
       </div>
       <div className="divide-y divide-border">
-        {sorted.length === 0 && (
-          <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhum alerta no momento</div>
+        {alerts.length === 0 && (
+          <div className="px-5 py-8 text-center text-sm text-muted-foreground">Nenhum vendedor cadastrado</div>
         )}
-        {sorted.map((log, index) => (
+        {alerts.map((log, index) => (
           <div key={log.sellerId} className="px-5 py-4 flex items-center gap-4">
             <span className="text-xs font-mono text-muted-foreground w-6">{index + 1}.</span>
             <div className={cn(
@@ -29,18 +50,17 @@ export default function AlertsPage() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground">{log.sellerName}</p>
               <p className="text-xs text-muted-foreground">
-                {log.daysSinceLastSale === 0
-                  ? "Vendeu hoje"
-                  : `${log.daysSinceLastSale} dia(s) sem vender`}
+                {!log.hasAnySale
+                  ? "Nunca vendeu"
+                  : log.daysSinceLastSale === 0
+                    ? `Vendeu hoje (${log.hoursSinceLastSale}h atrás)`
+                    : `${log.daysSinceLastSale} dia(s) sem vender`}
               </p>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <Clock className="h-3 w-3" />
-              <span>{log.totalIdleMinutes}min ocioso</span>
+              <span>{log.hasAnySale ? `${log.hoursSinceLastSale}h` : "—"}</span>
             </div>
-            <span className="text-xs text-muted-foreground bg-secondary px-2 py-0.5 rounded-full">
-              {log.idlePeriods}x pausas
-            </span>
           </div>
         ))}
       </div>
