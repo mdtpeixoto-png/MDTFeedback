@@ -1,15 +1,11 @@
-# API de Ingestão de Dados — MDTFeedback
+# API de Feedback — MDTFeedback
 
 ## Autenticação
 
-Todas as requisições devem incluir o header com **um dos tokens válidos**:
+Todas as requisições devem incluir o header:
 ```
-Authorization: Bearer <API_INGEST_TOKEN>
+Authorization: Bearer <API_KEY>
 ```
-
-Tokens aceitos:
-- `API_INGEST_TOKEN` — token customizado definido nos Secrets do projeto (recomendado para integrações externas como n8n)
-- `SUPABASE_SERVICE_ROLE_KEY` — chave de serviço do backend (uso interno)
 
 ## URL Base
 
@@ -19,29 +15,105 @@ https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data
 
 ## Tipos Disponíveis
 
-- `usuario`: cria um usuário de acesso à plataforma e registra perfil/papel. Se o papel for `seller`, o mesmo `id` também é cadastrado em `funcionarios` para uso em `vendedor_id`.
-- `funcionario`: cadastra um funcionário/vendedor manualmente.
-- `ligacao`: cadastra uma ligação analisada com link externo de áudio.
-- `batch`: processa múltiplos itens em uma única chamada.
+- `feedback`: registra um feedback de ligação com dados de venda
+- `usuario`: cria usuário de acesso à plataforma
+- `funcionario`: cadastra funcionário/vendedor manualmente
+- `batch`: processa múltiplos itens em lote
 
 ---
 
-## POST — Criar Usuário
+## POST — Registrar Feedback de Ligação
 
-### JSON mínimo (obrigatório)
+### JSON completo
 
 ```json
 {
-  "type": "usuario",
+  "type": "feedback",
   "data": {
-    "email": "vendedor@empresa.com",
-    "password": "SenhaForte123!",
-    "nome_completo": "João da Silva"
+    "lead_id": "LEAD-001",
+    "vendedor_id": "uuid-do-vendedor",
+    "vendedor_nome": "João da Silva",
+    "resumo_ligacao": "Ligação de 5 minutos sobre plano premium...",
+    "pontos_fortes": "Boa entonação\nConhecimento do produto\nEmpatia com o cliente",
+    "pontos_fracos": "Faltou urgência\nNão ofereceu upgrade",
+    "audio_url": "https://exemplo.com/audio/ligacao-123.mp3",
+    "status": true,
+    "receita": 150.00,
+    "operadora": "Claro"
   }
 }
 ```
 
-### JSON completo
+### Exemplo com curl
+
+```bash
+curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
+  -H "Authorization: Bearer SUA_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "feedback",
+    "data": {
+      "lead_id": "LEAD-001",
+      "vendedor_id": "550e8400-e29b-41d4-a716-446655440000",
+      "vendedor_nome": "João da Silva",
+      "resumo_ligacao": "Cliente interessado no plano 5GB Claro",
+      "pontos_fortes": "Boa comunicação\nConhecimento técnico",
+      "pontos_fracos": "Demora no fechamento",
+      "audio_url": "https://exemplo.com/audio.mp3",
+      "status": true,
+      "receita": 99.90,
+      "operadora": "Claro"
+    }
+  }'
+```
+
+### Resposta de sucesso
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "uuid-gerado",
+    "vendedor_id": "uuid-do-vendedor",
+    "vendedor_nome": "João da Silva",
+    "lead_id": "LEAD-001",
+    "resumo": "Cliente interessado no plano 5GB Claro",
+    "pontos_bons": "Boa comunicação\nConhecimento técnico",
+    "pontos_ruins": "Demora no fechamento",
+    "url_audio": "https://exemplo.com/audio.mp3",
+    "status": true,
+    "receita": 99.90,
+    "operadora": "Claro",
+    "created_at": "2026-04-08T12:00:00.000Z"
+  }
+}
+```
+
+### Campos
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| lead_id | String | Não | Identificador do lead |
+| vendedor_id | UUID | **Sim** | ID do vendedor. Se não existir, será criado automaticamente |
+| vendedor_nome | String | Condicional | **Obrigatório** se o vendedor_id não existir no banco. Ignorado se já existir |
+| resumo_ligacao | Text | Não | Resumo da ligação |
+| pontos_fortes | Text | Não | Pontos positivos separados por `\n` |
+| pontos_fracos | Text | Não | Pontos negativos separados por `\n` |
+| audio_url | URL | Não | Link para download do áudio |
+| status | Boolean | Não | `true` = Venda, `false` = Não vendeu (padrão: `false`) |
+| receita | Number | Não | Valor da venda (forçado a `0` se `status == false`) |
+| operadora | String | Não | Nome da operadora vendida (forçado a `null` se `status == false`) |
+
+### Regras de Consistência
+
+- Se `status == false`: `receita` é forçada a `0` e `operadora` é forçada a `null`
+- Se o `vendedor_id` não existir no banco, o vendedor é criado usando `vendedor_nome`
+- Se o `vendedor_id` já existir, `vendedor_nome` enviado é **ignorado** e o nome do banco é utilizado
+- `created_at` é gerado automaticamente com timestamp exato do registro
+
+---
+
+## POST — Criar Usuário
 
 ```json
 {
@@ -56,187 +128,27 @@ https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data
 }
 ```
 
-### Exemplo completo com curl
-
-```bash
-curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
-  -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "usuario",
-    "data": {
-      "email": "vendedor@empresa.com",
-      "password": "SenhaForte123!",
-      "nome_completo": "João da Silva",
-      "role": "seller",
-      "email_confirmado": true
-    }
-  }'
-```
-
-### Resposta de sucesso
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid-do-usuario",
-    "email": "vendedor@empresa.com",
-    "nome_completo": "João da Silva",
-    "role": "seller",
-    "email_confirmado": true,
-    "funcionario_id": "uuid-do-usuario"
-  }
-}
-```
-
-**Campos:**
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
-| email | String | **Sim** | E-mail de acesso do usuário |
-| password | String | **Sim** | Senha inicial do usuário |
-| nome_completo | String | **Sim** | Nome completo usado no perfil |
-| role | Enum | Não | Papel do usuário: `developer`, `admin` ou `seller` (padrão: `seller`) |
-| email_confirmado | Boolean | Não | Define se o usuário já sai com e-mail confirmado |
-
-> Se `role` for `seller`, use o `funcionario_id` retornado como `vendedor_id` ao cadastrar ligações.
+| email | String | **Sim** | E-mail de acesso |
+| password | String | **Sim** | Senha inicial |
+| nome_completo | String | **Sim** | Nome completo |
+| role | Enum | Não | `developer`, `admin` ou `seller` (padrão: `seller`) |
+| email_confirmado | Boolean | Não | Se o e-mail já sai confirmado |
 
 ---
 
 ## POST — Cadastrar Funcionário
 
-### JSON mínimo (obrigatório)
-
 ```json
 {
   "type": "funcionario",
-  "data": {
-    "nome_completo": "João da Silva"
-  }
-}
-```
-
-### JSON completo (com ID personalizado)
-
-```json
-{
-  "type": "funcionario",
-  "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "nome_completo": "João da Silva"
-  }
-}
-```
-
-### Exemplo completo com curl
-
-```bash
-curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
-  -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "funcionario",
-    "data": {
-      "nome_completo": "João da Silva"
-    }
-  }'
-```
-
-### Resposta de sucesso
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid-gerado-automaticamente",
-    "nome_completo": "João da Silva",
-    "created_at": "2026-04-01T12:00:00.000Z"
-  }
-}
-```
-
-**Campos:**
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| id | UUID | Não | ID do funcionário (gerado automaticamente se não informado) |
-| nome_completo | String | **Sim** | Nome completo do funcionário |
-
----
-
-## POST — Cadastrar Ligação
-
-### JSON mínimo (obrigatório)
-
-```json
-{
-  "type": "ligacao",
-  "data": {
-    "vendedor_id": "uuid-do-funcionario",
-    "resumo": "Ligação de 5 minutos sobre plano premium..."
-  }
-}
-```
-
-### JSON completo
-
-```json
-{
-  "type": "ligacao",
   "data": {
     "id": "uuid-opcional",
-    "vendedor_id": "uuid-do-funcionario",
-    "pontos_bons": "Boa entonação, conhecimento do produto...",
-    "pontos_ruins": "Faltou empatia, não ofereceu alternativas...",
-    "resumo": "Ligação de 5 minutos sobre plano premium...",
-    "url_audio": "https://exemplo.com/audio/ligacao-123.mp3"
+    "nome_completo": "João da Silva"
   }
 }
 ```
-
-### Exemplo completo com curl
-
-```bash
-curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
-  -H "Authorization: Bearer SUA_SERVICE_ROLE_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "type": "ligacao",
-    "data": {
-      "vendedor_id": "UUID_DO_FUNCIONARIO",
-      "pontos_bons": "Boa comunicação",
-      "pontos_ruins": "Faltou fechamento",
-      "resumo": "Ligação sobre plano básico",
-      "url_audio": "https://exemplo.com/audio.mp3"
-    }
-  }'
-```
-
-### Resposta de sucesso
-
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid-gerado-automaticamente",
-    "vendedor_id": "uuid-do-funcionario",
-    "pontos_bons": "Boa comunicação",
-    "pontos_ruins": "Faltou fechamento",
-    "resumo": "Ligação sobre plano básico",
-    "url_audio": "https://exemplo.com/audio.mp3",
-    "created_at": "2026-04-01T12:00:00.000Z"
-  }
-}
-```
-
-**Campos:**
-| Campo | Tipo | Obrigatório | Descrição |
-|-------|------|-------------|-----------|
-| id | UUID | Não | ID da ligação (gerado automaticamente se não informado) |
-| vendedor_id | UUID | **Sim** | ID do funcionário (deve existir na tabela funcionarios) |
-| pontos_bons | Text | Não | Pontos positivos identificados na ligação |
-| pontos_ruins | Text | Não | Pontos negativos identificados na ligação |
-| resumo | Text | Não | Resumo da ligação |
-| url_audio | URL | Não | Link externo para download do áudio da ligação |
 
 ---
 
@@ -247,10 +159,22 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
   "type": "batch",
   "data": {
     "items": [
-      { "type": "usuario", "data": { "email": "novo@empresa.com", "password": "Senha123!", "nome_completo": "Maria Santos" } },
-      { "type": "funcionario", "data": { "nome_completo": "Carlos Lima" } },
-      { "type": "ligacao", "data": { "vendedor_id": "...", "resumo": "..." } }
+      { "type": "feedback", "data": { "vendedor_id": "...", "vendedor_nome": "...", "resumo_ligacao": "...", "status": true, "receita": 100, "operadora": "Claro" } },
+      { "type": "feedback", "data": { "vendedor_id": "...", "vendedor_nome": "...", "resumo_ligacao": "...", "status": false } }
     ]
   }
 }
 ```
+
+---
+
+## Impacto Pós-Registro
+
+Ao registrar um feedback, os seguintes dados são atualizados automaticamente na plataforma:
+
+1. **Listagem de Ligações** — O feedback aparece na tela geral e na página do vendedor
+2. **Análise de Desempenho** — Pontos fortes/fracos agregados são recalculados
+3. **Alertas Operacionais** — Inatividade (dias sem venda) é atualizada
+4. **Métricas Globais** — Receita total, quantidade de feedbacks e média por vendedor
+5. **Gráficos** — Vendas por operadora e por período do dia/semana
+6. **Ranking** — Posição dos vendedores recalculada
