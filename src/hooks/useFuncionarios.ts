@@ -10,10 +10,15 @@ export interface Funcionario {
 export interface Ligacao {
   id: string;
   vendedor_id: string;
+  vendedor_nome: string | null;
+  lead_id: string | null;
   pontos_bons: string | null;
   pontos_ruins: string | null;
   resumo: string | null;
   url_audio: string | null;
+  status: boolean | null;
+  receita: number | null;
+  operadora: string | null;
   created_at: string;
 }
 
@@ -22,7 +27,7 @@ export function useFuncionarios() {
     queryKey: ["funcionarios"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("funcionarios" as any)
+        .from("funcionarios")
         .select("*")
         .order("nome_completo");
       if (error) throw error;
@@ -36,7 +41,7 @@ export function useLigacoes(vendedorId?: string) {
     queryKey: ["ligacoes", vendedorId],
     queryFn: async () => {
       let query = supabase
-        .from("ligacoes" as any)
+        .from("ligacoes")
         .select("*")
         .order("created_at", { ascending: false });
 
@@ -57,7 +62,7 @@ export function useFuncionario(id?: string) {
     enabled: !!id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("funcionarios" as any)
+        .from("funcionarios")
         .select("*")
         .eq("id", id!)
         .single();
@@ -65,4 +70,10 @@ export function useFuncionario(id?: string) {
       return data as unknown as Funcionario;
     },
   });
+}
+
+// Helper: parse \n-separated text into array
+export function parsePoints(text: string | null): string[] {
+  if (!text) return [];
+  return text.split("\n").map(s => s.trim()).filter(Boolean);
 }
