@@ -142,6 +142,7 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
 {
   "type": "funcionario",
   "data": {
+    "id": 42,
     "nome_completo": "João da Silva",
     "email": "joao@empresa.com",
     "password": "SenhaForte123!"
@@ -151,11 +152,12 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
 
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
+| id | Number | **Sim** | ID numérico pré-definido do funcionário (deve ser único) |
 | nome_completo | String | **Sim** | Nome completo do vendedor |
 | email | String | **Sim** | E-mail de acesso à plataforma |
 | password | String | **Sim** | Senha inicial de acesso |
 
-> **Nota:** Cria automaticamente o usuário de autenticação com role `seller`, o perfil e o registro de funcionário. O `funcionario_id` é gerado como número sequencial.
+> **Nota:** O `id` deve ser informado externamente (pré-determinado fora da plataforma). Cria automaticamente o usuário de autenticação com role `seller`, o perfil e o registro de funcionário.
 
 ---
 

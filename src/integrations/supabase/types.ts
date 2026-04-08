@@ -149,12 +149,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          id?: never
+          id?: number
           nome_completo: string
         }
         Update: {
           created_at?: string
-          id?: never
+          id?: number
           nome_completo?: string
         }
         Relationships: []

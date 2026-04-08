@@ -126,8 +126,13 @@ Deno.serve(async (req) => {
       }
 
       case "funcionario": {
-        if (!data.nome_completo || !data.email || !data.password) {
-          return jsonResponse({ error: "Campos 'nome_completo', 'email' e 'password' são obrigatórios" }, 400);
+        if (!data.nome_completo || !data.email || !data.password || data.id === undefined || data.id === null) {
+          return jsonResponse({ error: "Campos 'id', 'nome_completo', 'email' e 'password' são obrigatórios" }, 400);
+        }
+
+        const funcId = Number(data.id);
+        if (!Number.isInteger(funcId) || funcId <= 0) {
+          return jsonResponse({ error: "Campo 'id' deve ser um número inteiro positivo" }, 400);
         }
 
         // 1. Create auth user
@@ -153,10 +158,10 @@ Deno.serve(async (req) => {
           const { error: roleErr } = await supabase.from("user_roles").insert({ user_id: funcAuthUser.id, role: "seller" });
           if (roleErr) throw roleErr;
 
-          // 4. Create funcionario record
+          // 4. Create funcionario record with custom ID
           const { data: newFunc, error: funcErr } = await supabase
             .from("funcionarios")
-            .insert({ nome_completo: data.nome_completo })
+            .insert({ id: funcId, nome_completo: data.nome_completo })
             .select()
             .single();
           if (funcErr) throw funcErr;
