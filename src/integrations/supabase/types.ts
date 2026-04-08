@@ -193,29 +193,44 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          lead_id: string | null
+          operadora: string | null
           pontos_bons: string | null
           pontos_ruins: string | null
+          receita: number | null
           resumo: string | null
+          status: boolean | null
           url_audio: string | null
           vendedor_id: string
+          vendedor_nome: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          lead_id?: string | null
+          operadora?: string | null
           pontos_bons?: string | null
           pontos_ruins?: string | null
+          receita?: number | null
           resumo?: string | null
+          status?: boolean | null
           url_audio?: string | null
           vendedor_id: string
+          vendedor_nome?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          lead_id?: string | null
+          operadora?: string | null
           pontos_bons?: string | null
           pontos_ruins?: string | null
+          receita?: number | null
           resumo?: string | null
+          status?: boolean | null
           url_audio?: string | null
           vendedor_id?: string
+          vendedor_nome?: string | null
         }
         Relationships: [
           {
