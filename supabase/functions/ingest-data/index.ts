@@ -19,6 +19,55 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+function isEmailAlreadyRegisteredError(error: unknown) {
+  return error instanceof Error && /already been registered/i.test(error.message);
+}
+
+async function findAuthUserByEmail(supabase: ReturnType<typeof createClient>, email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+
+  for (let page = 1; page <= 10; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+
+    const existingUser = data.users.find((user) => user.email?.trim().toLowerCase() === normalizedEmail);
+    if (existingUser) return existingUser;
+
+    if (data.users.length < 1000) break;
+  }
+
+  return null;
+}
+
+async function getOrCreateAuthUser(
+  supabase: ReturnType<typeof createClient>,
+  options: { email: string; password: string; name: string; emailConfirm: boolean }
+) {
+  const payload = {
+    email: options.email,
+    password: options.password,
+    email_confirm: options.emailConfirm,
+    user_metadata: { name: options.name },
+  };
+
+  const { data, error } = await supabase.auth.admin.createUser(payload);
+
+  if (!error) {
+    if (!data.user) throw new Error("Falha ao criar usuário no backend");
+    return { user: data.user, created: true };
+  }
+
+  if (!isEmailAlreadyRegisteredError(error)) throw error;
+
+  const existingUser = await findAuthUserByEmail(supabase, options.email);
+  if (!existingUser) throw error;
+
+  const { data: updatedUserData, error: updateUserError } = await supabase.auth.admin.updateUserById(existingUser.id, payload);
+  if (updateUserError) throw updateUserError;
+
+  return { user: updatedUserData.user ?? existingUser, created: false };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -80,16 +129,13 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: `Campo 'role' inválido. Válidos: ${APP_ROLES.join(", ")}` }, 400);
         }
 
-        const { data: createdUserData, error: createUserError } = await supabase.auth.admin.createUser({
+        let funcionarioId = null;
+        const { user: authUser, created: createdAuthUser } = await getOrCreateAuthUser(supabase, {
           email: data.email,
           password: data.password,
-          email_confirm: emailConfirmado,
-          user_metadata: { name: data.nome_completo },
+          emailConfirm: emailConfirmado,
+          name: data.nome_completo,
         });
-
-        if (createUserError) throw createUserError;
-        const authUser = createdUserData.user;
-        if (!authUser) throw new Error("Falha ao criar usuário no backend");
 
         try {
           const { error: profileError } = await supabase.from("profiles").upsert(
@@ -98,10 +144,12 @@ Deno.serve(async (req) => {
           );
           if (profileError) throw profileError;
 
-          const { error: roleError } = await supabase.from("user_roles").insert({ user_id: authUser.id, role });
+          const { error: roleError } = await supabase.from("user_roles").upsert(
+            { user_id: authUser.id, role },
+            { onConflict: "user_id,role" }
+          );
           if (roleError) throw roleError;
 
-          let funcionarioId = null;
           if (role === "seller") {
             const { data: newFunc, error: funcionarioError } = await supabase.from("funcionarios").insert(
               { nome_completo: data.nome_completo }
@@ -110,7 +158,9 @@ Deno.serve(async (req) => {
             funcionarioId = newFunc?.id ?? null;
           }
         } catch (error) {
-          await supabase.auth.admin.deleteUser(authUser.id);
+          if (createdAuthUser) {
+            await supabase.auth.admin.deleteUser(authUser.id);
+          }
           throw error;
         }
 
@@ -135,16 +185,12 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: "Campo 'id' deve ser um número inteiro positivo" }, 400);
         }
 
-        // 1. Create auth user
-        const { data: createdFuncUser, error: createFuncUserError } = await supabase.auth.admin.createUser({
+        const { user: funcAuthUser, created: createdAuthUser } = await getOrCreateAuthUser(supabase, {
           email: data.email,
           password: data.password,
-          email_confirm: true,
-          user_metadata: { name: data.nome_completo },
+          emailConfirm: true,
+          name: data.nome_completo,
         });
-        if (createFuncUserError) throw createFuncUserError;
-        const funcAuthUser = createdFuncUser.user;
-        if (!funcAuthUser) throw new Error("Falha ao criar usuário no backend");
 
         try {
           // 2. Create profile
@@ -155,13 +201,16 @@ Deno.serve(async (req) => {
           if (profileErr) throw profileErr;
 
           // 3. Assign seller role
-          const { error: roleErr } = await supabase.from("user_roles").insert({ user_id: funcAuthUser.id, role: "seller" });
+          const { error: roleErr } = await supabase.from("user_roles").upsert(
+            { user_id: funcAuthUser.id, role: "seller" },
+            { onConflict: "user_id,role" }
+          );
           if (roleErr) throw roleErr;
 
           // 4. Create funcionario record with custom ID
           const { data: newFunc, error: funcErr } = await supabase
             .from("funcionarios")
-            .insert({ id: funcId, nome_completo: data.nome_completo })
+            .upsert({ id: funcId, nome_completo: data.nome_completo }, { onConflict: "id" })
             .select()
             .single();
           if (funcErr) throw funcErr;
@@ -175,7 +224,9 @@ Deno.serve(async (req) => {
           };
         } catch (err) {
           // Rollback: delete auth user if any step fails
-          await supabase.auth.admin.deleteUser(funcAuthUser.id);
+          if (createdAuthUser) {
+            await supabase.auth.admin.deleteUser(funcAuthUser.id);
+          }
           throw err;
         }
         break;
