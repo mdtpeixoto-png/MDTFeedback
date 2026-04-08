@@ -136,18 +136,26 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
 
 ---
 
-## POST — Cadastrar Funcionário
+## POST — Cadastrar Funcionário (+ Usuário automático)
 
 ```json
 {
   "type": "funcionario",
   "data": {
-    "nome_completo": "João da Silva"
+    "nome_completo": "João da Silva",
+    "email": "joao@empresa.com",
+    "password": "SenhaForte123!"
   }
 }
 ```
 
-> **Nota:** O `id` é gerado automaticamente como número inteiro sequencial.
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| nome_completo | String | **Sim** | Nome completo do vendedor |
+| email | String | **Sim** | E-mail de acesso à plataforma |
+| password | String | **Sim** | Senha inicial de acesso |
+
+> **Nota:** Cria automaticamente o usuário de autenticação com role `seller`, o perfil e o registro de funcionário. O `funcionario_id` é gerado como número sequencial.
 
 ---
 
