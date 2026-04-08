@@ -129,7 +129,6 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: "Campo 'nome_completo' é obrigatório" }, 400);
         }
         const insertData: Record<string, unknown> = { nome_completo: data.nome_completo };
-        if (data.id !== undefined) insertData.id = Number(data.id);
 
         const { error, data: inserted } = await supabase.from("funcionarios").insert(insertData).select().single();
         if (error) throw error;
@@ -138,31 +137,34 @@ Deno.serve(async (req) => {
       }
 
       case "feedback": {
-        if (!data.vendedor_id && data.vendedor_id !== 0) {
-          return jsonResponse({ error: "Campo 'vendedor_id' é obrigatório (numérico)" }, 400);
-        }
+        let vendedorIdNum: number;
+        let vendedorNome: string;
 
-        const vendedorIdNum = Number(data.vendedor_id);
-        const { data: existingFunc } = await supabase
-          .from("funcionarios")
-          .select("id, nome_completo")
-          .eq("id", vendedorIdNum)
-          .maybeSingle();
+        if (data.vendedor_id !== undefined && data.vendedor_id !== null) {
+          // Existing seller by ID
+          vendedorIdNum = Number(data.vendedor_id);
+          const { data: existingFunc } = await supabase
+            .from("funcionarios")
+            .select("id, nome_completo")
+            .eq("id", vendedorIdNum)
+            .maybeSingle();
 
-        let vendedorNome = data.vendedor_nome ?? "Vendedor";
-
-        if (!existingFunc) {
-          if (!data.vendedor_nome) {
-            return jsonResponse({ error: "Campo 'vendedor_nome' é obrigatório quando o vendedor_id não existe no banco" }, 400);
+          if (!existingFunc) {
+            return jsonResponse({ error: `Vendedor com id ${vendedorIdNum} não encontrado. Crie primeiro com type 'funcionario'.` }, 400);
           }
-          const { error: funcErr } = await supabase.from("funcionarios").insert({
-            id: vendedorIdNum,
-            nome_completo: data.vendedor_nome,
-          });
-          if (funcErr) throw funcErr;
-          vendedorNome = data.vendedor_nome;
-        } else {
           vendedorNome = existingFunc.nome_completo;
+        } else if (data.vendedor_nome) {
+          // Auto-create seller by name
+          const { data: newFunc, error: funcErr } = await supabase
+            .from("funcionarios")
+            .insert({ nome_completo: data.vendedor_nome })
+            .select()
+            .single();
+          if (funcErr) throw funcErr;
+          vendedorIdNum = newFunc.id;
+          vendedorNome = newFunc.nome_completo;
+        } else {
+          return jsonResponse({ error: "Informe 'vendedor_id' (existente) ou 'vendedor_nome' (para criar novo)" }, 400);
         }
 
         const status = data.status === true;
