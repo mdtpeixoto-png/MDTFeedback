@@ -126,14 +126,53 @@ Deno.serve(async (req) => {
       }
 
       case "funcionario": {
-        if (!data.nome_completo) {
-          return jsonResponse({ error: "Campo 'nome_completo' é obrigatório" }, 400);
+        if (!data.nome_completo || !data.email || !data.password) {
+          return jsonResponse({ error: "Campos 'nome_completo', 'email' e 'password' são obrigatórios" }, 400);
         }
-        const insertData: Record<string, unknown> = { nome_completo: data.nome_completo };
 
-        const { error, data: inserted } = await supabase.from("funcionarios").insert(insertData).select().single();
-        if (error) throw error;
-        result = inserted;
+        // 1. Create auth user
+        const { data: createdFuncUser, error: createFuncUserError } = await supabase.auth.admin.createUser({
+          email: data.email,
+          password: data.password,
+          email_confirm: true,
+          user_metadata: { name: data.nome_completo },
+        });
+        if (createFuncUserError) throw createFuncUserError;
+        const funcAuthUser = createdFuncUser.user;
+        if (!funcAuthUser) throw new Error("Falha ao criar usuário no backend");
+
+        try {
+          // 2. Create profile
+          const { error: profileErr } = await supabase.from("profiles").upsert(
+            { user_id: funcAuthUser.id, name: data.nome_completo, email: data.email, avatar_url: null, is_active: true },
+            { onConflict: "user_id" }
+          );
+          if (profileErr) throw profileErr;
+
+          // 3. Assign seller role
+          const { error: roleErr } = await supabase.from("user_roles").insert({ user_id: funcAuthUser.id, role: "seller" });
+          if (roleErr) throw roleErr;
+
+          // 4. Create funcionario record
+          const { data: newFunc, error: funcErr } = await supabase
+            .from("funcionarios")
+            .insert({ nome_completo: data.nome_completo })
+            .select()
+            .single();
+          if (funcErr) throw funcErr;
+
+          result = {
+            funcionario_id: newFunc.id,
+            user_id: funcAuthUser.id,
+            nome_completo: data.nome_completo,
+            email: data.email,
+            role: "seller",
+          };
+        } catch (err) {
+          // Rollback: delete auth user if any step fails
+          await supabase.auth.admin.deleteUser(funcAuthUser.id);
+          throw err;
+        }
         break;
       }
 
