@@ -10,8 +10,8 @@ interface RankingItem {
 
 interface RankingTableProps {
   data: RankingItem[];
-  onSelect?: (id: string) => void;
-  highlightId?: string;
+  onSelect?: (id: number | string) => void;
+  highlightId?: string | number;
 }
 
 export default function RankingTable({ data, onSelect, highlightId }: RankingTableProps) {
