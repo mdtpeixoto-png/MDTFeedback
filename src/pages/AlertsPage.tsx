@@ -13,10 +13,10 @@ export default function AlertsPage() {
       : null;
     const daysSinceLastSale = lastSaleDate
       ? Math.floor((Date.now() - lastSaleDate.getTime()) / (1000 * 60 * 60 * 24))
-      : 999;
+      : null;
     const hoursSinceLastSale = lastSaleDate
       ? Math.floor((Date.now() - lastSaleDate.getTime()) / (1000 * 60 * 60))
-      : 0;
+      : null;
 
     return {
       sellerId: f.id,
@@ -25,7 +25,7 @@ export default function AlertsPage() {
       hoursSinceLastSale,
       hasAnySale: sellerSales.length > 0,
     };
-  }).sort((a, b) => b.daysSinceLastSale - a.daysSinceLastSale);
+  }).sort((a, b) => (b.daysSinceLastSale ?? -1) - (a.daysSinceLastSale ?? -1));
 
   return (
     <div className="glass-card overflow-hidden">
