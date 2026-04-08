@@ -144,17 +144,17 @@ export type Database = {
       funcionarios: {
         Row: {
           created_at: string
-          id: string
+          id: number
           nome_completo: string
         }
         Insert: {
           created_at?: string
-          id?: string
+          id?: never
           nome_completo: string
         }
         Update: {
           created_at?: string
-          id?: string
+          id?: never
           nome_completo?: string
         }
         Relationships: []
@@ -201,7 +201,7 @@ export type Database = {
           resumo: string | null
           status: boolean | null
           url_audio: string | null
-          vendedor_id: string
+          vendedor_id: number
           vendedor_nome: string | null
         }
         Insert: {
@@ -215,7 +215,7 @@ export type Database = {
           resumo?: string | null
           status?: boolean | null
           url_audio?: string | null
-          vendedor_id: string
+          vendedor_id: number
           vendedor_nome?: string | null
         }
         Update: {
@@ -229,7 +229,7 @@ export type Database = {
           resumo?: string | null
           status?: boolean | null
           url_audio?: string | null
-          vendedor_id?: string
+          vendedor_id?: number
           vendedor_nome?: string | null
         }
         Relationships: [

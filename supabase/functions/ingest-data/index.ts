@@ -101,12 +101,13 @@ Deno.serve(async (req) => {
           const { error: roleError } = await supabase.from("user_roles").insert({ user_id: authUser.id, role });
           if (roleError) throw roleError;
 
+          let funcionarioId = null;
           if (role === "seller") {
-            const { error: funcionarioError } = await supabase.from("funcionarios").upsert(
-              { id: authUser.id, nome_completo: data.nome_completo },
-              { onConflict: "id" }
-            );
+            const { data: newFunc, error: funcionarioError } = await supabase.from("funcionarios").insert(
+              { nome_completo: data.nome_completo }
+            ).select("id").single();
             if (funcionarioError) throw funcionarioError;
+            funcionarioId = newFunc?.id ?? null;
           }
         } catch (error) {
           await supabase.auth.admin.deleteUser(authUser.id);
@@ -119,7 +120,7 @@ Deno.serve(async (req) => {
           nome_completo: data.nome_completo,
           role,
           email_confirmado: Boolean(authUser.email_confirmed_at),
-          funcionario_id: role === "seller" ? authUser.id : null,
+          funcionario_id: funcionarioId,
         };
         break;
       }
@@ -129,7 +130,6 @@ Deno.serve(async (req) => {
           return jsonResponse({ error: "Campo 'nome_completo' é obrigatório" }, 400);
         }
         const insertData: Record<string, unknown> = { nome_completo: data.nome_completo };
-        if (data.id) insertData.id = data.id;
 
         const { error, data: inserted } = await supabase.from("funcionarios").insert(insertData).select().single();
         if (error) throw error;
@@ -138,30 +138,34 @@ Deno.serve(async (req) => {
       }
 
       case "feedback": {
-        if (!data.vendedor_id) {
-          return jsonResponse({ error: "Campo 'vendedor_id' é obrigatório" }, 400);
-        }
+        let vendedorIdNum: number;
+        let vendedorNome: string;
 
-        const { data: existingFunc } = await supabase
-          .from("funcionarios")
-          .select("id, nome_completo")
-          .eq("id", data.vendedor_id)
-          .maybeSingle();
+        if (data.vendedor_id !== undefined && data.vendedor_id !== null) {
+          // Existing seller by ID
+          vendedorIdNum = Number(data.vendedor_id);
+          const { data: existingFunc } = await supabase
+            .from("funcionarios")
+            .select("id, nome_completo")
+            .eq("id", vendedorIdNum)
+            .maybeSingle();
 
-        let vendedorNome = data.vendedor_nome ?? "Vendedor";
-
-        if (!existingFunc) {
-          if (!data.vendedor_nome) {
-            return jsonResponse({ error: "Campo 'vendedor_nome' é obrigatório quando o vendedor_id não existe no banco" }, 400);
+          if (!existingFunc) {
+            return jsonResponse({ error: `Vendedor com id ${vendedorIdNum} não encontrado. Crie primeiro com type 'funcionario'.` }, 400);
           }
-          const { error: funcErr } = await supabase.from("funcionarios").insert({
-            id: data.vendedor_id,
-            nome_completo: data.vendedor_nome,
-          });
-          if (funcErr) throw funcErr;
-          vendedorNome = data.vendedor_nome;
-        } else {
           vendedorNome = existingFunc.nome_completo;
+        } else if (data.vendedor_nome) {
+          // Auto-create seller by name
+          const { data: newFunc, error: funcErr } = await supabase
+            .from("funcionarios")
+            .insert({ nome_completo: data.vendedor_nome })
+            .select()
+            .single();
+          if (funcErr) throw funcErr;
+          vendedorIdNum = newFunc.id;
+          vendedorNome = newFunc.nome_completo;
+        } else {
+          return jsonResponse({ error: "Informe 'vendedor_id' (existente) ou 'vendedor_nome' (para criar novo)" }, 400);
         }
 
         const status = data.status === true;
@@ -169,7 +173,7 @@ Deno.serve(async (req) => {
         const operadora = status ? (data.operadora ?? null) : null;
 
         const insertData: Record<string, unknown> = {
-          vendedor_id: data.vendedor_id,
+          vendedor_id: vendedorIdNum,
           vendedor_nome: vendedorNome,
           lead_id: data.lead_id ?? null,
           resumo: data.resumo_ligacao ?? data.resumo ?? null,
@@ -193,12 +197,12 @@ Deno.serve(async (req) => {
       }
 
       case "ligacao": {
-        if (!data.vendedor_id) {
-          return jsonResponse({ error: "Campo 'vendedor_id' é obrigatório" }, 400);
+        if (!data.vendedor_id && data.vendedor_id !== 0) {
+          return jsonResponse({ error: "Campo 'vendedor_id' é obrigatório (numérico)" }, 400);
         }
 
         const insertData: Record<string, unknown> = {
-          vendedor_id: data.vendedor_id,
+          vendedor_id: Number(data.vendedor_id),
           pontos_bons: data.pontos_bons ?? null,
           pontos_ruins: data.pontos_ruins ?? null,
           resumo: data.resumo ?? null,

@@ -18,8 +18,8 @@ function SellerOverview({ user }: { user: AppUser }) {
   const { data: allLigacoes = [] } = useLigacoes();
 
   // Find this user's funcionario by matching user_id
-  const myFunc = funcionarios.find(f => f.id === user.id);
-  const myLigacoes = allLigacoes.filter(l => l.vendedor_id === user.id);
+  const myFunc = funcionarios.find(f => String(f.id) === user.id);
+  const myLigacoes = allLigacoes.filter(l => String(l.vendedor_id) === user.id);
   const mySales = myLigacoes.filter(l => l.status);
   const totalValue = myLigacoes.reduce((sum, l) => sum + (l.receita ?? 0), 0);
 
@@ -28,7 +28,7 @@ function SellerOverview({ user }: { user: AppUser }) {
     id: f.id,
     totalSales: allLigacoes.filter(l => l.vendedor_id === f.id && l.status).length,
   })).sort((a, b) => b.totalSales - a.totalSales);
-  const position = ranking.findIndex(r => r.id === user.id) + 1;
+  const position = ranking.findIndex(r => String(r.id) === user.id) + 1;
 
   // By operadora
   const operadoras = [...new Set(myLigacoes.filter(l => l.operadora).map(l => l.operadora!))];

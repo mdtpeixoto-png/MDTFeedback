@@ -2,14 +2,14 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export interface Funcionario {
-  id: string;
+  id: number;
   nome_completo: string;
   created_at: string;
 }
 
 export interface Ligacao {
   id: string;
-  vendedor_id: string;
+  vendedor_id: number;
   vendedor_nome: string | null;
   lead_id: string | null;
   pontos_bons: string | null;
@@ -36,7 +36,7 @@ export function useFuncionarios() {
   });
 }
 
-export function useLigacoes(vendedorId?: string) {
+export function useLigacoes(vendedorId?: string | number) {
   return useQuery({
     queryKey: ["ligacoes", vendedorId],
     queryFn: async () => {
@@ -45,8 +45,8 @@ export function useLigacoes(vendedorId?: string) {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (vendedorId) {
-        query = query.eq("vendedor_id", vendedorId);
+      if (vendedorId !== undefined) {
+        query = query.eq("vendedor_id", Number(vendedorId));
       }
 
       const { data, error } = await query;
@@ -56,15 +56,15 @@ export function useLigacoes(vendedorId?: string) {
   });
 }
 
-export function useFuncionario(id?: string) {
+export function useFuncionario(id?: string | number) {
   return useQuery({
     queryKey: ["funcionario", id],
-    enabled: !!id,
+    enabled: id !== undefined,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("funcionarios")
         .select("*")
-        .eq("id", id!)
+        .eq("id", Number(id))
         .single();
       if (error) throw error;
       return data as unknown as Funcionario;
