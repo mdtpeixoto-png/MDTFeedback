@@ -101,12 +101,13 @@ Deno.serve(async (req) => {
           const { error: roleError } = await supabase.from("user_roles").insert({ user_id: authUser.id, role });
           if (roleError) throw roleError;
 
+          let funcionarioId = null;
           if (role === "seller") {
-            const { error: funcionarioError } = await supabase.from("funcionarios").upsert(
-              { id: authUser.id, nome_completo: data.nome_completo },
-              { onConflict: "id" }
-            );
+            const { data: newFunc, error: funcionarioError } = await supabase.from("funcionarios").insert(
+              { nome_completo: data.nome_completo }
+            ).select("id").single();
             if (funcionarioError) throw funcionarioError;
+            funcionarioId = newFunc?.id ?? null;
           }
         } catch (error) {
           await supabase.auth.admin.deleteUser(authUser.id);
@@ -119,7 +120,7 @@ Deno.serve(async (req) => {
           nome_completo: data.nome_completo,
           role,
           email_confirmado: Boolean(authUser.email_confirmed_at),
-          funcionario_id: role === "seller" ? authUser.id : null,
+          funcionario_id: funcionarioId,
         };
         break;
       }
