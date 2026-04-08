@@ -31,8 +31,7 @@ https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data
   "type": "feedback",
   "data": {
     "lead_id": "LEAD-001",
-    "vendedor_id": "uuid-do-vendedor",
-    "vendedor_nome": "João da Silva",
+    "vendedor_id": 1,
     "resumo_ligacao": "Ligação de 5 minutos sobre plano premium...",
     "pontos_fortes": "Boa entonação\nConhecimento do produto\nEmpatia com o cliente",
     "pontos_fracos": "Faltou urgência\nNão ofereceu upgrade",
@@ -54,8 +53,7 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
     "type": "feedback",
     "data": {
       "lead_id": "LEAD-001",
-      "vendedor_id": "550e8400-e29b-41d4-a716-446655440000",
-      "vendedor_nome": "João da Silva",
+      "vendedor_id": 1,
       "resumo_ligacao": "Cliente interessado no plano 5GB Claro",
       "pontos_fortes": "Boa comunicação\nConhecimento técnico",
       "pontos_fracos": "Demora no fechamento",
@@ -74,7 +72,7 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
   "success": true,
   "data": {
     "id": "uuid-gerado",
-    "vendedor_id": "uuid-do-vendedor",
+    "vendedor_id": 1,
     "vendedor_nome": "João da Silva",
     "lead_id": "LEAD-001",
     "resumo": "Cliente interessado no plano 5GB Claro",
@@ -94,8 +92,8 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
 | lead_id | String | Não | Identificador do lead |
-| vendedor_id | UUID | **Sim** | ID do vendedor. Se não existir, será criado automaticamente |
-| vendedor_nome | String | Condicional | **Obrigatório** se o vendedor_id não existir no banco. Ignorado se já existir |
+| vendedor_id | Number | Condicional | ID numérico do vendedor. Obrigatório se `vendedor_nome` não for enviado |
+| vendedor_nome | String | Condicional | Nome do vendedor. Se `vendedor_id` não for enviado, cria um novo vendedor automaticamente |
 | resumo_ligacao | Text | Não | Resumo da ligação |
 | pontos_fortes | Text | Não | Pontos positivos separados por `\n` |
 | pontos_fracos | Text | Não | Pontos negativos separados por `\n` |
@@ -107,8 +105,8 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
 ### Regras de Consistência
 
 - Se `status == false`: `receita` é forçada a `0` e `operadora` é forçada a `null`
-- Se o `vendedor_id` não existir no banco, o vendedor é criado usando `vendedor_nome`
-- Se o `vendedor_id` já existir, `vendedor_nome` enviado é **ignorado** e o nome do banco é utilizado
+- Se `vendedor_id` for informado, deve existir no banco (crie antes com type `funcionario`)
+- Se `vendedor_nome` for informado sem `vendedor_id`, um novo vendedor é criado automaticamente
 - `created_at` é gerado automaticamente com timestamp exato do registro
 
 ---
@@ -144,11 +142,12 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
 {
   "type": "funcionario",
   "data": {
-    "id": "uuid-opcional",
     "nome_completo": "João da Silva"
   }
 }
 ```
+
+> **Nota:** O `id` é gerado automaticamente como número inteiro sequencial.
 
 ---
 
@@ -159,8 +158,8 @@ curl -X POST https://miwiumgvnspnmxdmfnut.supabase.co/functions/v1/ingest-data \
   "type": "batch",
   "data": {
     "items": [
-      { "type": "feedback", "data": { "vendedor_id": "...", "vendedor_nome": "...", "resumo_ligacao": "...", "status": true, "receita": 100, "operadora": "Claro" } },
-      { "type": "feedback", "data": { "vendedor_id": "...", "vendedor_nome": "...", "resumo_ligacao": "...", "status": false } }
+      { "type": "feedback", "data": { "vendedor_id": 1, "resumo_ligacao": "...", "status": true, "receita": 100, "operadora": "Claro" } },
+      { "type": "feedback", "data": { "vendedor_nome": "Novo Vendedor", "resumo_ligacao": "...", "status": false } }
     ]
   }
 }
