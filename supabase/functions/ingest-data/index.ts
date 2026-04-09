@@ -151,8 +151,26 @@ Deno.serve(async (req) => {
           if (roleError) throw roleError;
 
           if (role === "seller") {
+            if (!data.id && data.id !== 0) {
+              throw new Error("Campo 'id' é obrigatório para criar funcionário (role 'seller')");
+            }
+            const funcId = Number(data.id);
+            if (!Number.isInteger(funcId) || funcId <= 0) {
+              throw new Error("Campo 'id' deve ser um número inteiro positivo");
+            }
+
+            // Check for duplicate
+            const { data: existingFunc } = await supabase
+              .from("funcionarios")
+              .select("id")
+              .eq("id", funcId)
+              .maybeSingle();
+            if (existingFunc) {
+              throw new Error(`Funcionário com id ${funcId} já está cadastrado.`);
+            }
+
             const { data: newFunc, error: funcionarioError } = await supabase.from("funcionarios").insert(
-              { nome_completo: data.nome_completo }
+              { id: funcId, nome_completo: data.nome_completo }
             ).select("id").single();
             if (funcionarioError) throw funcionarioError;
             funcionarioId = newFunc?.id ?? null;
