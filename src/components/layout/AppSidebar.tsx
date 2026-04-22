@@ -55,8 +55,8 @@ export default function AppSidebar({ user, onLogout }: SidebarProps) {
   return (
     <aside className="flex flex-col w-64 h-screen bg-sidebar border-r border-sidebar-border sticky top-0 shrink-0">
       <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
-        <div className="flex items-center justify-center h-9 w-9 rounded-lg bg-primary">
-          <BarChart3 className="h-5 w-5 text-primary-foreground" />
+        <div className="flex items-center justify-center h-10 w-10">
+          <img src="/logo.png" alt="Logo" className="h-full w-auto object-contain" />
         </div>
         <div>
           <h1 className="text-base font-bold text-sidebar-accent-foreground tracking-tight">MDTFeedback</h1>

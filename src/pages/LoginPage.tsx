@@ -60,8 +60,8 @@ export default function LoginPage() {
       >
         {/* Logo */}
         <div className="text-center mb-10">
-          <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary mb-4">
-            <BarChart3 className="h-7 w-7 text-primary-foreground" />
+          <div className="inline-flex items-center justify-center mb-4">
+            <img src="/logo.png" alt="Logo MDTFeedback" className="h-20 w-auto" />
           </div>
           <h1 className="text-2xl font-bold text-foreground">MDTFeedback</h1>
           <p className="text-sm text-muted-foreground mt-1">Análise de desempenho para call centers</p>
