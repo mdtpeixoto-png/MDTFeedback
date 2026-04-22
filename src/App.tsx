@@ -43,21 +43,15 @@ function AppRoutes() {
     );
   }
 
-  // Logged in but no role assigned
-  if (!user.role) {
-    return (
-      <Routes>
-        <Route path="*" element={<PendingApprovalPage />} />
-      </Routes>
-    );
-  }
+  // Simplified: Default to 'seller' if no role is assigned
+  const userRole = user.role || "seller";
 
   // Build a compatible User object for legacy dashboard components
   const legacyUser = {
     id: user.id,
     name: user.name,
     email: user.email,
-    role: user.role,
+    role: userRole as "developer" | "admin" | "seller",
     avatar: user.avatar,
   };
 
