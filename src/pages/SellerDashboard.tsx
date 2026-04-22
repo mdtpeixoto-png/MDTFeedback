@@ -17,9 +17,11 @@ function SellerOverview({ user }: { user: AppUser }) {
   const { data: funcionarios = [] } = useFuncionarios();
   const { data: allLigacoes = [] } = useLigacoes();
 
-  // Find this user's funcionario by matching user_id
-  const myFunc = funcionarios.find(f => String(f.id) === user.id);
-  const myLigacoes = allLigacoes.filter(l => String(l.vendedor_id) === user.id);
+  // Find this user's funcionario by matching email
+  const myFunc = funcionarios.find(f => f.email === user.email);
+  const myLigacoes = myFunc 
+    ? allLigacoes.filter(l => l.vendedor_id === myFunc.id)
+    : [];
   const mySales = myLigacoes.filter(l => l.status);
   const totalValue = myLigacoes.reduce((sum, l) => sum + (l.receita ?? 0), 0);
 
@@ -28,7 +30,7 @@ function SellerOverview({ user }: { user: AppUser }) {
     id: f.id,
     totalSales: allLigacoes.filter(l => l.vendedor_id === f.id && l.status).length,
   })).sort((a, b) => b.totalSales - a.totalSales);
-  const position = ranking.findIndex(r => String(r.id) === user.id) + 1;
+  const position = myFunc ? ranking.findIndex(r => r.id === myFunc.id) + 1 : 0;
 
   // By operadora
   const operadoras = [...new Set(myLigacoes.filter(l => l.operadora).map(l => l.operadora!))];
@@ -106,7 +108,9 @@ function SellerOverview({ user }: { user: AppUser }) {
 }
 
 function SellerFeedbacks({ user }: { user: AppUser }) {
-  const { data: ligacoes = [] } = useLigacoes(user.id);
+  const { data: funcionarios = [] } = useFuncionarios();
+  const myFunc = funcionarios.find(f => f.email === user.email);
+  const { data: ligacoes = [] } = useLigacoes(myFunc?.id);
 
   return (
     <div className="space-y-3">

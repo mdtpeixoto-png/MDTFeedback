@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export interface Funcionario {
   id: number;
   nome_completo: string;
+  email?: string;
   created_at: string;
 }
 
