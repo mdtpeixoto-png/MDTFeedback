@@ -8,6 +8,8 @@ import AdminSellerDetail from "@/components/admin/AdminSellerDetail";
 import SettingsPage from "@/pages/SettingsPage";
 import AlertsPage from "@/pages/AlertsPage";
 import { useFuncionarios, useLigacoes, type Ligacao } from "@/hooks/useFuncionarios";
+import { type AppUser } from "@/contexts/AuthContext";
+import { Users, Phone, BarChart3, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import LearningCurveChart from "@/components/dashboard/LearningCurveChart";
 import { getCurrentPeriodStart } from "@/lib/learning-curve";
