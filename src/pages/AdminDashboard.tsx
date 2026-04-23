@@ -8,9 +8,10 @@ import AdminSellerDetail from "@/components/admin/AdminSellerDetail";
 import SettingsPage from "@/pages/SettingsPage";
 import AlertsPage from "@/pages/AlertsPage";
 import { useFuncionarios, useLigacoes, type Ligacao } from "@/hooks/useFuncionarios";
-import { type AppUser } from "@/contexts/AuthContext";
-import { Users, Phone, BarChart3, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
+import LearningCurveChart from "@/components/dashboard/LearningCurveChart";
+import { getCurrentPeriodStart } from "@/lib/learning-curve";
+import { format } from "date-fns";
 
 interface AdminDashboardProps {
   user: AppUser;
@@ -31,8 +32,12 @@ function getPeriodOfDay(dateStr: string): string {
 
 function AdminHome() {
   const navigate = useNavigate();
+  const periodStart = getCurrentPeriodStart();
   const { data: funcionarios = [] } = useFuncionarios();
-  const { data: ligacoes = [] } = useLigacoes();
+  const { data: ligacoes = [] } = useLigacoes(undefined, periodStart);
+  // For learning curve, we might want a longer history or just the current period. 
+  // Let's use the current period for now or fetch all.
+  const { data: allLigacoes = [] } = useLigacoes(); 
 
   const sellerCount = funcionarios.length;
   const totalReceita = ligacoes.reduce((sum, l) => sum + (l.receita ?? 0), 0);
@@ -95,6 +100,23 @@ function AdminHome() {
     };
   });
 
+  // Prepare learning curve data (aggregated by day)
+  const learningData = allLigacoes
+    .slice()
+    .reverse()
+    .reduce((acc: any[], lig) => {
+      const date = format(new Date(lig.created_at), 'dd/MM');
+      const existing = acc.find(a => a.date === date);
+      const score = lig.score ?? 50;
+      if (existing) {
+        existing.score = (existing.score + score) / 2;
+      } else {
+        acc.push({ date, score });
+      }
+      return acc;
+    }, [])
+    .slice(-15); // Last 15 days with data
+
   return (
     <>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -107,6 +129,13 @@ function AdminHome() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <ProductPieChart data={byProduct} />
         <SalesLineChart data={byWeek} label="Vendas por Semana / Período do Dia" />
+      </div>
+
+      <div className="mb-6">
+        <LearningCurveChart 
+          data={learningData} 
+          title={`Curva de Aprendizado Geral — Equipe (Desde ${format(periodStart, 'dd/MM')})`} 
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

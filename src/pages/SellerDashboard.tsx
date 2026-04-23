@@ -7,6 +7,9 @@ import { useLigacoes, useFuncionarios, parsePoints } from "@/hooks/useFuncionari
 import { type AppUser } from "@/contexts/AuthContext";
 import SettingsPage from "@/pages/SettingsPage";
 import { Phone, BarChart3, TrendingUp, Trophy, Download } from "lucide-react";
+import LearningCurveChart from "@/components/dashboard/LearningCurveChart";
+import { getCurrentPeriodStart } from "@/lib/learning-curve";
+import { format } from "date-fns";
 
 interface SellerDashboardProps {
   user: AppUser;
@@ -16,7 +19,11 @@ interface SellerDashboardProps {
 function SellerOverview({ user }: { user: AppUser }) {
   const { data: funcionarios = [] } = useFuncionarios();
   const myFunc = funcionarios.find(f => f.email === user.email);
-  const { data: myLigacoes = [] } = useLigacoes(myFunc?.id ?? "NOT_FOUND");
+  const periodStart = getCurrentPeriodStart();
+  const { data: myLigacoes = [] } = useLigacoes(myFunc?.id ?? "NOT_FOUND", periodStart);
+  
+  // For learning curve, fetch all to see the progress
+  const { data: allMyLigacoes = [] } = useLigacoes(myFunc?.id ?? "NOT_FOUND");
   const mySales = myLigacoes.filter(l => l.status);
   const totalValue = myLigacoes.reduce((sum, l) => sum + (l.receita ?? 0), 0);
 
@@ -30,6 +37,23 @@ function SellerOverview({ user }: { user: AppUser }) {
   const byProduct = operadoras.length > 0
     ? operadoras.map(op => ({ name: op, value: myLigacoes.filter(l => l.operadora === op && l.status).length }))
     : [];
+
+  // Learning curve data
+  const learningData = allMyLigacoes
+    .slice()
+    .reverse()
+    .reduce((acc: any[], lig) => {
+      const date = format(new Date(lig.created_at), 'dd/MM');
+      const existing = acc.find(a => a.date === date);
+      const score = lig.score ?? 50;
+      if (existing) {
+        existing.score = (existing.score + score) / 2;
+      } else {
+        acc.push({ date, score });
+      }
+      return acc;
+    }, [])
+    .slice(-15);
 
   return (
     <>
@@ -45,6 +69,13 @@ function SellerOverview({ user }: { user: AppUser }) {
           <SalesBarChart data={byProduct} label="Minhas Vendas por Operadora" />
         </div>
       )}
+
+      <div className="mb-6">
+        <LearningCurveChart 
+          data={learningData} 
+          title={`Minha Curva de Aprendizado (Desde ${format(periodStart, 'dd/MM')})`} 
+        />
+      </div>
 
       <div className="glass-card overflow-hidden">
         <div className="px-5 py-4 border-b border-border flex items-center gap-2">

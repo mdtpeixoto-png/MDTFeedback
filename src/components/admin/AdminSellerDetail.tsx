@@ -3,11 +3,19 @@ import MetricCard from "@/components/dashboard/MetricCard";
 import { SalesBarChart } from "@/components/dashboard/Charts";
 import { useFuncionario, useLigacoes, parsePoints } from "@/hooks/useFuncionarios";
 import { Phone, TrendingUp, Trophy, ArrowLeft, ThumbsUp, ThumbsDown, Download } from "lucide-react";
+import LearningCurveChart from "@/components/dashboard/LearningCurveChart";
+import { getCurrentPeriodStart } from "@/lib/learning-curve";
+import { format } from "date-fns";
 
 export default function AdminSellerDetail() {
   const { id } = useParams<{ id: string }>();
   const { data: seller, isLoading: loadingSeller } = useFuncionario(id);
-  const { data: ligacoes = [], isLoading: loadingLigacoes } = useLigacoes(id);
+  
+  const periodStart = getCurrentPeriodStart();
+  const { data: ligacoesPeriodo = [], isLoading: loadingLigacoes } = useLigacoes(id, periodStart);
+  
+  // Fetch all to see full progress
+  const { data: ligacoes = [] } = useLigacoes(id);
 
   if (loadingSeller || loadingLigacoes) {
     return <div className="text-muted-foreground text-sm">Carregando...</div>;
@@ -17,8 +25,8 @@ export default function AdminSellerDetail() {
     return <div className="text-muted-foreground">Vendedor não encontrado.</div>;
   }
 
-  const sales = ligacoes.filter(l => l.status);
-  const totalValue = ligacoes.reduce((sum, l) => sum + (l.receita ?? 0), 0);
+  const sales = ligacoesPeriodo.filter(l => l.status);
+  const totalValue = ligacoesPeriodo.reduce((sum, l) => sum + (l.receita ?? 0), 0);
 
   // Aggregated strengths/weaknesses
   const strengthCount: Record<string, number> = {};
@@ -31,10 +39,27 @@ export default function AdminSellerDetail() {
   const weaknesses = Object.entries(weaknessCount).sort((a, b) => b[1] - a[1]);
 
   // By operadora
-  const operadoras = [...new Set(ligacoes.filter(l => l.operadora).map(l => l.operadora!))];
+  const operadoras = [...new Set(ligacoesPeriodo.filter(l => l.operadora).map(l => l.operadora!))];
   const byProduct = operadoras.length > 0
-    ? operadoras.map(op => ({ name: op, value: ligacoes.filter(l => l.operadora === op && l.status).length }))
+    ? operadoras.map(op => ({ name: op, value: ligacoesPeriodo.filter(l => l.operadora === op && l.status).length }))
     : [];
+
+  // Learning curve data
+  const learningData = ligacoes
+    .slice()
+    .reverse()
+    .reduce((acc: any[], lig) => {
+      const date = format(new Date(lig.created_at), 'dd/MM');
+      const existing = acc.find(a => a.date === date);
+      const score = lig.score ?? 50;
+      if (existing) {
+        existing.score = (existing.score + score) / 2;
+      } else {
+        acc.push({ date, score });
+      }
+      return acc;
+    }, [])
+    .slice(-15);
 
   return (
     <div>
@@ -47,8 +72,15 @@ export default function AdminSellerDetail() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <MetricCard label="Vendas" value={sales.length} icon={<TrendingUp className="h-5 w-5" />} />
         <MetricCard label="Receita" value={`R$ ${totalValue.toLocaleString('pt-BR')}`} icon={<Phone className="h-5 w-5" />} />
-        <MetricCard label="Total Ligações" value={ligacoes.length} icon={<Phone className="h-5 w-5" />} />
-        <MetricCard label="Taxa Conversão" value={ligacoes.length > 0 ? `${Math.round((sales.length / ligacoes.length) * 100)}%` : '0%'} icon={<Trophy className="h-5 w-5" />} />
+        <MetricCard label="Total Ligações" value={ligacoesPeriodo.length} icon={<Phone className="h-5 w-5" />} />
+        <MetricCard label="Taxa Conversão" value={ligacoesPeriodo.length > 0 ? `${Math.round((sales.length / ligacoesPeriodo.length) * 100)}%` : '0%'} icon={<Trophy className="h-5 w-5" />} />
+      </div>
+
+      <div className="mb-6">
+        <LearningCurveChart 
+          data={learningData} 
+          title={`Curva de Aprendizado — ${seller.nome_completo}`} 
+        />
       </div>
 
       {/* Pontos Fortes e Fracos Gerais */}

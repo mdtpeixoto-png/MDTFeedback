@@ -10,6 +10,7 @@ export interface Funcionario {
 
 export interface Ligacao {
   id: string;
+  external_id: number | null;
   vendedor_id: number;
   vendedor_nome: string | null;
   lead_id: string | null;
@@ -20,6 +21,8 @@ export interface Ligacao {
   status: boolean | null;
   receita: number | null;
   operadora: string | null;
+  score: number | null;
+  technical_quality: number | null;
   created_at: string;
 }
 
@@ -37,9 +40,9 @@ export function useFuncionarios() {
   });
 }
 
-export function useLigacoes(vendedorId?: string | number | null) {
+export function useLigacoes(vendedorId?: string | number | null, startDate?: Date) {
   return useQuery({
-    queryKey: ["ligacoes", vendedorId],
+    queryKey: ["ligacoes", vendedorId, startDate?.toISOString()],
     queryFn: async () => {
       // If we explicitly passed null or a special value, return empty
       if (vendedorId === null || vendedorId === "NOT_FOUND" || vendedorId === -1) {
@@ -53,6 +56,10 @@ export function useLigacoes(vendedorId?: string | number | null) {
 
       if (vendedorId !== undefined) {
         query = query.eq("vendedor_id", Number(vendedorId));
+      }
+
+      if (startDate) {
+        query = query.gte("created_at", startDate.toISOString());
       }
 
       const { data, error } = await query;
