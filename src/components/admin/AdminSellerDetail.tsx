@@ -49,13 +49,18 @@ export default function AdminSellerDetail() {
     .slice()
     .reverse()
     .reduce((acc: any[], lig) => {
-      const date = format(new Date(lig.created_at), 'dd/MM');
-      const existing = acc.find(a => a.date === date);
-      const score = lig.score ?? 50;
-      if (existing) {
-        existing.score = (existing.score + score) / 2;
-      } else {
-        acc.push({ date, score });
+      try {
+        if (!lig.created_at) return acc;
+        const date = format(new Date(lig.created_at), 'dd/MM');
+        const existing = acc.find(a => a.date === date);
+        const score = lig.score ?? 50;
+        if (existing) {
+          existing.score = (existing.score + score) / 2;
+        } else {
+          acc.push({ date, score });
+        }
+      } catch (e) {
+        console.error("Erro ao formatar data para o gráfico:", e);
       }
       return acc;
     }, [])
