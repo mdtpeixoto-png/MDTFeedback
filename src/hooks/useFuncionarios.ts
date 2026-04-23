@@ -37,10 +37,15 @@ export function useFuncionarios() {
   });
 }
 
-export function useLigacoes(vendedorId?: string | number) {
+export function useLigacoes(vendedorId?: string | number | null) {
   return useQuery({
     queryKey: ["ligacoes", vendedorId],
     queryFn: async () => {
+      // If we explicitly passed null or a special value, return empty
+      if (vendedorId === null || vendedorId === "NOT_FOUND" || vendedorId === -1) {
+        return [];
+      }
+
       let query = supabase
         .from("ligacoes")
         .select("*")

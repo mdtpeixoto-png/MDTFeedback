@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Phone, Settings,
   LogOut, BarChart3, Notebook, Shield, Cog, AlertTriangle
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatName } from "@/lib/utils";
 
 interface SidebarUser {
   id: string;
@@ -88,10 +88,12 @@ export default function AppSidebar({ user, onLogout }: SidebarProps) {
       <div className="px-3 py-4 border-t border-sidebar-border">
         <div className="flex items-center gap-3 px-3 py-2">
           <div className="flex items-center justify-center h-8 w-8 rounded-full bg-secondary text-secondary-foreground text-xs font-bold">
-            {user.name.split(' ').map(n => n[0]).join('')}
+            {user.name.split(' ').map(n => n[0]).join('').toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-accent-foreground truncate">{user.name}</p>
+            <p className="text-sm font-medium text-sidebar-accent-foreground truncate">
+              {formatName(user.name)}
+            </p>
             {badge && (
               <span className="inline-flex items-center gap-1 text-[10px] text-primary uppercase tracking-wider">
                 {badge.icon} {badge.label}

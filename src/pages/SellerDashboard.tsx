@@ -15,22 +15,15 @@ interface SellerDashboardProps {
 
 function SellerOverview({ user }: { user: AppUser }) {
   const { data: funcionarios = [] } = useFuncionarios();
-  const { data: allLigacoes = [] } = useLigacoes();
-
-  // Find this user's funcionario by matching email
   const myFunc = funcionarios.find(f => f.email === user.email);
-  const myLigacoes = myFunc 
-    ? allLigacoes.filter(l => l.vendedor_id === myFunc.id)
-    : [];
+  const { data: myLigacoes = [] } = useLigacoes(myFunc?.id ?? "NOT_FOUND");
   const mySales = myLigacoes.filter(l => l.status);
   const totalValue = myLigacoes.reduce((sum, l) => sum + (l.receita ?? 0), 0);
 
-  // Ranking position
-  const ranking = funcionarios.map(f => ({
-    id: f.id,
-    totalSales: allLigacoes.filter(l => l.vendedor_id === f.id && l.status).length,
-  })).sort((a, b) => b.totalSales - a.totalSales);
-  const position = myFunc ? ranking.findIndex(r => r.id === myFunc.id) + 1 : 0;
+  // Ranking position - for now, we'll only show the user's own data 
+  // since RLS will prevent seeing others. 
+  // If a global ranking is needed, a separate view/API should be used.
+  const position = 0; // Simplified for now to avoid showing all data
 
   // By operadora
   const operadoras = [...new Set(myLigacoes.filter(l => l.operadora).map(l => l.operadora!))];
@@ -110,7 +103,7 @@ function SellerOverview({ user }: { user: AppUser }) {
 function SellerFeedbacks({ user }: { user: AppUser }) {
   const { data: funcionarios = [] } = useFuncionarios();
   const myFunc = funcionarios.find(f => f.email === user.email);
-  const { data: ligacoes = [] } = useLigacoes(myFunc?.id);
+  const { data: ligacoes = [] } = useLigacoes(myFunc?.id ?? "NOT_FOUND");
 
   return (
     <div className="space-y-3">
