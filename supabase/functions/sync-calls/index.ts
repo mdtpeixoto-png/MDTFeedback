@@ -1,240 +1,233 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { Client } from "https://deno.land/x/mysql/mod.ts"
 
-const MYSQL_CONFIG = {
-  hostname: "rs.gvctelecom.com.br",
-  port: 3339,
-  username: "kaua",
-  password: "zgB4$WywCLfi",
-  db: "asteriskcdrdb",
-};
+const MYSQL_CONFIG = { hostname: "rs.gvctelecom.com.br", port: 3339, username: "kaua", password: "zgB4$WywCLfi", db: "asteriskcdrdb" };
+const GEMINI_API_KEY = "AIzaSyCQ-h57vkue0fSb2Q-INW2wzjK0E-WG040";
+const MAKESYSTEM_KEY = "5B89EC45-B32C-4A2F-BFC9-A027FCAEF771"; // Necessário para a API GraphQL
 
-const GEMINI_API_KEY = "AIzaSyAaPiH8E2Gy3GuvGwDEvyJGk8iK-MCFEHc";
-const MAKESYSTEM_KEY = "5B89EC45-B32C-4A2F-BFC9-A027FCAEF771";
-const FAFALABS_TOKEN = "pp3lP4jqgzA8QLP6hw";
+// Cliente Supabase instanciado globalmente
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || "";
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || "";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? "";
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? "";
+const CRITERIA_LIST = ["Gatilhos de Abertura", "Sondagem Eficaz", "Comparativo Tecnológico", "Escolha Guiada", "Postura na Ligação", "Escuta Ativa", "Ordem do Script", "Velocidade da Fala", "Ética Profissional", "Gatilhos de Fechamento", "Conhecimento do Produto", "Controle da Chamada"];
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-const CRITERIA_LIST = [
-  "Gatilhos de Abertura", "Sondagem Eficaz", "Comparativo Tecnológico", 
-  "Escolha Guiada", "Postura na Ligação", "Escuta Ativa", 
-  "Ordem do Script", "Velocidade da Fala", "Ética Profissional", 
-  "Gatilhos de Fechamento", "Conhecimento do Produto", "Controle da Chamada"
-];
-
-const VALID_PRODUCTS = ["Nio", "Claro", "Vero", "Vivo"];
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 serve(async (req) => {
   let mysqlClient;
   try {
-    console.info("--- Início do Processamento de Sincronização ---");
-    
+    console.info("--- Início Sincronização (v9 - Busca Otimizada por Vendedor) ---");
     mysqlClient = await new Client().connect(MYSQL_CONFIG);
     
-    // 1. Buscar funcionários ativos
-    const { data: employees } = await supabase.from('funcionarios').select('*');
-    if (!employees || employees.length === 0) {
-      return new Response(JSON.stringify({ message: "Nenhum funcionário encontrado." }), { status: 200 });
-    }
+    const { data: employees, error: empError } = await supabase.from('funcionarios').select('*');
+    if (empError) throw new Error(`Erro ao buscar funcionários: ${empError.message}`);
+    if (!employees || employees.length === 0) return new Response("Sem funcionários válidos");
 
-    const employeeIds = employees.map(e => e.id);
-    const idList = employeeIds.join(',');
-
-    // --- FLUXO 1: BANCO DE DADOS (MYSQL) ---
-    console.info("Iniciando Fluxo 1: MySQL -> Make");
-    const mysqlCalls = await mysqlClient.query(`
-      SELECT idhistory_permanent, uniqueid, data, nome, phone, transcription, idusuario, sale, callurl
-      FROM history_permanent
-      WHERE transcription IS NOT NULL
-      AND idusuario IN (${idList})
-      AND data >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
-      ORDER BY data DESC
-      LIMIT 10
-    `);
-
-    if (mysqlCalls) {
-      for (const call of mysqlCalls) {
-        const uniqueidBase = String(call.uniqueid).split('.')[0];
-        const makeId = `WEB${call.idusuario}u${uniqueidBase}`;
-        
-        const { data: existing } = await supabase.from('ligacoes').select('id').eq('lead_id', makeId).maybeSingle();
-        if (existing) continue;
-
-        console.info(`Processando nova ligação MySQL: ${makeId}`);
-        const saleData = await fetchMakeSale(makeId);
-        const analysis = await analyzeWithGemini(call.transcription);
-        
-        await supabase.from('ligacoes').insert({
-          external_id: call.idhistory_permanent,
-          vendedor_id: call.idusuario,
-          vendedor_nome: call.nome,
-          lead_id: makeId,
-          pontos_bons: analysis.pontos_bons,
-          pontos_ruins: analysis.pontos_ruins,
-          resumo: analysis.resumo,
-          technical_quality: analysis.qualidade_tecnica,
-          score: calculateScore(analysis, !!saleData),
-          status: !!saleData,
-          receita: saleData?.valor || 0,
-          operadora: sanitizeProduct(saleData?.operadora),
-          url_audio: formatAudioUrl(call.data, call.callurl),
-          created_at: new Date(call.data).toISOString()
-        });
-      }
-    }
-
-    // --- FLUXO 2: BUSCA PELO MAKE ---
-    console.info("Iniciando Fluxo 2: Make -> MySQL");
     for (const seller of employees) {
-      const sales = await listMakeSalesForSeller(seller.id);
-      for (const sale of sales) {
-        const makeId = sale.identificador;
-        const { data: existing } = await supabase.from('ligacoes').select('id').eq('lead_id', makeId).maybeSingle();
-        if (existing) continue;
+      if (!seller.id) continue;
+      console.info(`\n>> Processando Vendedor: ${seller.nome_completo || seller.id}`);
 
-        console.info(`Encontrada venda no Make não registrada: ${makeId}`);
+      // ==========================================
+      // FLUXO A: Buscar a última venda no Make
+      // ==========================================
+      try {
+        const queryMake = JSON.stringify({
+          query: `query { listar_vendas(ids_de_usuarios: [${seller.id}], limite: 1, pagina: 1) { identificador valor dataRegistro statusVenda { nome } } }`
+        });
         
-        const uniqueidPart = makeId.includes('u') ? makeId.split('u')[1] : null;
-        let mysqlRec = [];
-        if (uniqueidPart) {
-           mysqlRec = await mysqlClient.query(`
-            SELECT * FROM history_permanent 
-            WHERE idusuario = ${seller.id} 
-            AND uniqueid LIKE '${uniqueidPart}%'
-            LIMIT 1
-          `);
-        }
+        const gqlRes = await fetch('https://legacyapi.makesystem.com.br/sale/graphql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'key': MAKESYSTEM_KEY },
+          body: queryMake
+        });
+        
+        const gqlData = await gqlRes.json();
+        const makeSale = gqlData?.data?.listar_vendas?.[0];
 
-        if (mysqlRec && mysqlRec.length > 0) {
-          const rec = mysqlRec[0];
-          const analysis = await analyzeWithGemini(rec.transcription || "");
-          await supabase.from('ligacoes').insert({
-            external_id: rec.idhistory_permanent,
-            vendedor_id: seller.id,
-            vendedor_nome: seller.nome_completo,
-            lead_id: makeId,
-            pontos_bons: analysis.pontos_bons,
-            pontos_ruins: analysis.pontos_ruins,
-            resumo: analysis.resumo,
-            technical_quality: analysis.qualidade_tecnica,
-            score: calculateScore(analysis, true),
-            status: true,
-            receita: sale.valor || 0,
-            operadora: sanitizeProduct(sale.operadora),
-            url_audio: formatAudioUrl(rec.data, rec.callurl),
-            created_at: new Date(rec.data).toISOString()
-          });
-        } else if (sale.valor > 0) {
-          await supabase.from('ligacoes').insert({
-            vendedor_id: seller.id,
-            vendedor_nome: seller.nome_completo,
-            lead_id: makeId,
-            status: true,
-            receita: sale.valor || 0,
-            operadora: sanitizeProduct(sale.operadora),
-            created_at: sale.dataRegistro ? new Date(sale.dataRegistro).toISOString() : new Date().toISOString()
-          });
+        if (makeSale && makeSale.identificador) {
+          const makeId = makeSale.identificador;
+          const { data: existing } = await supabase.from('ligacoes').select('id').eq('lead_id', makeId).maybeSingle();
+          
+          if (!existing) {
+            console.info(`[Fluxo A] Nova venda encontrada no Make: ${makeId}. Buscando áudio...`);
+            
+            // Busca o áudio no MySQL usando a coluna exata "sale" ou fallback para uniqueid
+            const dbMatch = await mysqlClient.query(`
+              SELECT * FROM history_permanent 
+              WHERE (sale = '${makeId}' OR uniqueid LIKE '%${makeId.replace(`WEB${seller.id}u`, '')}%')
+              AND transcription IS NOT NULL
+              ORDER BY data DESC LIMIT 1
+            `);
+
+            if (dbMatch && dbMatch.length > 0) {
+              const call = dbMatch[0];
+              const rawText = extractTextFromTranscription(call.transcription);
+              const analysis = await analyzeWithGemini(rawText);
+              
+              const insertObj = {
+                external_id: call.idhistory_permanent,
+                vendedor_id: seller.id,
+                vendedor_nome: seller.nome_completo,
+                lead_id: makeId,
+                pontos_bons: analysis.pontos_bons,
+                pontos_ruins: analysis.pontos_ruins,
+                resumo: analysis.resumo,
+                technical_quality: analysis.qualidade_tecnica,
+                score: (analysis.qualidade_tecnica * 10) + 20, // +20 pois é venda confirmada
+                status: true,
+                receita: parseFloat(makeSale.valor || "0"),
+                operadora: makeSale.statusVenda?.nome || null,
+                url_audio: formatAudioUrl(call.data, call.callurl),
+                created_at: new Date(call.data).toISOString()
+              };
+              
+              const insertRes = await supabase.from('ligacoes').insert(insertObj);
+              if (insertRes && insertRes.error) console.error(`[Fluxo A] Erro ao salvar: ${insertRes.error.message}`);
+              else console.info(`[Fluxo A] ✅ Venda Completa salva com sucesso!`);
+              
+              await delay(4000); // Pausa segurança Gemini
+            } else {
+              // Se não encontrou o áudio no MySQL, salva apenas a venda
+              console.info(`[Fluxo A] Áudio não encontrado. Salvando apenas os dados da venda.`);
+              const insertRes = await supabase.from('ligacoes').insert({
+                vendedor_id: seller.id,
+                vendedor_nome: seller.nome_completo,
+                lead_id: makeId,
+                status: true,
+                receita: parseFloat(makeSale.valor || "0"),
+                operadora: makeSale.statusVenda?.nome || null,
+                created_at: makeSale.dataRegistro ? new Date(makeSale.dataRegistro).toISOString() : new Date().toISOString()
+              });
+              if (insertRes && insertRes.error) console.error(`[Fluxo A] Erro ao salvar venda parcial: ${insertRes.error.message}`);
+            }
+          }
         }
+      } catch (e: any) {
+        console.error(`[Fluxo A] Falha ao processar venda para ${seller.id}: ${e.message}`);
+      }
+
+      // ==========================================
+      // FLUXO B: Buscar a última ligação no Banco
+      // ==========================================
+      try {
+        const mysqlCall = await mysqlClient.query(`
+          SELECT idhistory_permanent, uniqueid, data, nome, transcription, idusuario, callurl, sale
+          FROM history_permanent
+          WHERE idusuario = ${seller.id} AND transcription IS NOT NULL
+          AND data >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+          ORDER BY data DESC LIMIT 1
+        `);
+
+        if (mysqlCall && mysqlCall.length > 0) {
+          const call = mysqlCall[0];
+          // Utiliza a coluna 'sale' se existir, senão usa a matemática segura
+          const callIdNum = extractTimestampFromUniqueid(String(call.uniqueid), call.data);
+          const makeId = call.sale && String(call.sale).trim() !== "" ? call.sale : `WEB${call.idusuario}u${callIdNum}`;
+
+          const { data: existing } = await supabase.from('ligacoes').select('id').eq('lead_id', makeId).maybeSingle();
+          
+          if (!existing) {
+            console.info(`[Fluxo B] Nova ligação encontrada no MySQL: ${makeId}. Iniciando análise...`);
+            
+            // Verifica se essa chamada específica resultou em venda diretamente via API
+            const saleData = await fetchMakeSaleGraphQL(makeId);
+            
+            const rawText = extractTextFromTranscription(call.transcription);
+            const analysis = await analyzeWithGemini(rawText);
+            
+            const insertObj = {
+              external_id: call.idhistory_permanent,
+              vendedor_id: call.idusuario,
+              vendedor_nome: seller.nome_completo || call.nome,
+              lead_id: makeId,
+              pontos_bons: analysis.pontos_bons,
+              pontos_ruins: analysis.pontos_ruins,
+              resumo: analysis.resumo,
+              technical_quality: analysis.qualidade_tecnica,
+              score: (analysis.qualidade_tecnica * 10) + (saleData ? 20 : 0),
+              status: !!saleData,
+              receita: saleData?.valor || 0,
+              operadora: saleData?.operadora || null,
+              url_audio: formatAudioUrl(call.data, call.callurl),
+              created_at: new Date(call.data).toISOString()
+            };
+
+            const insertRes = await supabase.from('ligacoes').insert(insertObj);
+            if (insertRes && insertRes.error) console.error(`[Fluxo B] Erro ao salvar: ${insertRes.error.message}`);
+            else console.info(`[Fluxo B] ✅ Ligação salva com sucesso!`);
+            
+            await delay(4000); // Pausa segurança Gemini
+          }
+        }
+      } catch (e: any) {
+        console.error(`[Fluxo B] Falha ao processar ligação para ${seller.id}: ${e.message}`);
       }
     }
 
-    return new Response(JSON.stringify({ message: "Sincronização concluída com sucesso." }), { headers: { "Content-Type": "application/json" } });
-
-  } catch (error) {
-    console.error(`ERRO: ${error.message}`);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ message: "Sincronização OK" }), { headers: { "Content-Type": "application/json" } });
+  } catch (error: any) {
+    console.error(`ERRO CRÍTICO GERAL: ${error?.message || error}`);
+    return new Response(error?.message || "Erro Interno", { status: 500 });
   } finally {
     if (mysqlClient) {
-      try { await mysqlClient.close(); } catch (e) { console.error("Erro ao fechar MySQL:", e.message); }
+      try {
+        await mysqlClient.close();
+      } catch (closeErr: any) {
+        console.error(`Erro ao fechar conexão MySQL: ${closeErr?.message || closeErr}`);
+      }
     }
   }
 });
 
-async function analyzeWithGemini(transcription: string) {
-  if (!transcription || transcription.trim().length < 10) {
-    return { pontos_bons: "", pontos_ruins: "", qualidade_tecnica: 5, resumo: "Transcrição curta ou vazia." };
-  }
-
-  const model = "gemini-1.5-flash"; 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-  
-  const prompt = `Analise a seguinte transcrição de uma ligação de vendas:
-"${transcription}"
-
-LISTA ÚNICA DE CRITÉRIOS PARA OUTPUT
-Use apenas estes termos para preencher os campos pontos_bons e pontos_ruins:
-${CRITERIA_LIST.join(' | ')}
-
-DIRETRIZES DE ANÁLISE:
-- Justificativa Interna: Avalie a postura, ética e técnica do vendedor baseando-se no script e boas práticas.
-- Proibição de Texto Extra: Nos campos de pontos, é terminantemente proibido adicionar qualquer texto que não seja um dos termos da lista acima.
-- Quantidade: Liste apenas o que foi evidenciado na chamada. Se não houver pontos bons ou ruins, retorne string vazia "".
-
-Retorne APENAS um JSON no formato:
-{ 
-  "pontos_bons": "Termo1\\nTermo2", 
-  "pontos_ruins": "Termo3", 
-  "qualidade_tecnica": nota_0_a_10, 
-  "resumo": "breve resumo da ligação" 
-}`;
-
+function extractTextFromTranscription(raw: string): string {
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-    });
-
-    const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
-    const cleaned = text.replace(/```json|```/g, "").trim();
-    return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("Erro no Gemini:", e.message);
-    return { pontos_bons: "", pontos_ruins: "", qualidade_tecnica: 5, resumo: "Falha na análise da IA." };
-  }
+    const json = JSON.parse(raw);
+    let text = json.text || json.transcript || (json.results && json.results[0]?.transcript) || "";
+    if (!text && json.segments) text = json.segments.map((s: any) => s.text).join(" ");
+    return text.trim();
+  } catch (e) { return raw?.trim() || ""; }
 }
 
-async function fetchMakeSale(id: string) {
+async function analyzeWithGemini(text: string) {
+  if (!text || text.length < 10) return { pontos_bons: "", pontos_ruins: "", qualidade_tecnica: 0, resumo: "Sem conteúdo." };
+  
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+  const prompt = `Analise a transcrição: "${text.substring(0, 4500)}". Use APENAS termos desta lista: ${CRITERIA_LIST.join(', ')}. Retorne JSON: { "pontos_bons": "Termo\\nTermo", "pontos_ruins": "Termo", "qualidade_tecnica": 0-10, "resumo": "..." }`;
+  
   try {
-    const fafaUrl = `https://fafalabs.com.br/api/v1/make_sales.php?token=${FAFALABS_TOKEN}&id=${id}`;
-    const res = await fetch(fafaUrl);
+    const res = await fetch(url, { method: 'POST', body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }) });
     const data = await res.json();
-    if (data && data.identificador) {
-      return { 
-        valor: parseFloat(data.valor || "0"), 
-        operadora: data.operadora || data.statusVenda?.nome || data.produto,
-        dataRegistro: data.dataRegistro
-      };
+    
+    if (!data || data.error) {
+      console.error("Gemini Error:", data?.error?.message || "Unknown");
+      return { pontos_bons: "", pontos_ruins: "", qualidade_tecnica: 0, resumo: "Erro Gemini." };
     }
 
-    const query = JSON.stringify({
-      query: `query { listar_vendas(identificador: "${id}") { valor statusVenda { nome } } }`
-    });
-    const gqlRes = await fetch('https://legacyapi.makesystem.com.br/sale/graphql', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'key': MAKESYSTEM_KEY },
-      body: query
-    });
-    const gqlData = await gqlRes.json();
-    const sale = gqlData.data?.listar_vendas?.[0];
-    if (sale) return { valor: parseFloat(sale.valor || "0"), operadora: sale.statusVenda?.nome };
-  } catch (e) {
-    console.error(`Erro ao buscar venda ${id}:`, e.message);
+    const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!rawText) return { pontos_bons: "", pontos_ruins: "", qualidade_tecnica: 0, resumo: "IA bloqueada." };
+    
+    const result = JSON.parse(rawText.replace(/```json|```/g, "").trim());
+    const filter = (str: string) => (str || "").split('\n').map(t => t.trim()).filter(t => CRITERIA_LIST.includes(t)).join('\n');
+    
+    return {
+      pontos_bons: filter(result.pontos_bons),
+      pontos_ruins: filter(result.pontos_ruins),
+      qualidade_tecnica: result.qualidade_tecnica || 0,
+      resumo: result.resumo || ""
+    };
+  } catch (e: any) { 
+    console.error("Catch Gemini:", e?.message || e);
+    return { pontos_bons: "", pontos_ruins: "", qualidade_tecnica: 0, resumo: "Erro técnico." }; 
   }
-  return null;
 }
 
-async function listMakeSalesForSeller(sellerId: number) {
+// Opcional: Busca GraphQL para checar vendas individuais no Fluxo B
+async function fetchMakeSaleGraphQL(identificador: string) {
   try {
-    // Busca vendas do vendedor nas últimas 24h via GraphQL
     const query = JSON.stringify({
-      query: `query { listar_vendas(usuario_id: ${sellerId}) { identificador valor dataRegistro statusVenda { nome } } }`
+      query: `query { listar_vendas(identificador: "${identificador}", limite: 1) { valor statusVenda { nome } } }`
     });
     const res = await fetch('https://legacyapi.makesystem.com.br/sale/graphql', {
       method: 'POST',
@@ -242,25 +235,48 @@ async function listMakeSalesForSeller(sellerId: number) {
       body: query
     });
     const data = await res.json();
-    return data.data?.listar_vendas || [];
+    const sale = data?.data?.listar_vendas?.[0];
+    if (sale) {
+      return { valor: parseFloat(sale.valor || "0"), operadora: sale.statusVenda?.nome };
+    }
   } catch (e) {
-    return [];
+    // Falha silenciosa permitida
   }
-}
-
-function calculateScore(analysis: any, isSale: boolean) {
-  let score = (analysis.qualidade_tecnica || 5) * 10;
-  if (isSale) score += 20;
-  return Math.min(100, score);
-}
-
-function sanitizeProduct(productName: string | undefined) {
-  if (!productName) return null;
-  const found = VALID_PRODUCTS.find(p => productName.toLowerCase().includes(p.toLowerCase()));
-  return found || productName;
+  return null;
 }
 
 function formatAudioUrl(dateStr: string, callUrl: string) {
-  const date = new Date(dateStr);
-  return `http://rs.gvctelecom.com.br:1079/gravacoes/${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}/${callUrl}`;
+  const d = new Date(dateStr);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `http://rs.gvctelecom.com.br:1079/gravacoes/${year}/${month}/${day}/${year}/${callUrl}`;
+}
+
+function extractTimestampFromUniqueid(uniqueid: string, callData: string | Date): string {
+  if (!uniqueid) return Math.floor(new Date(callData).getTime() / 1000).toString();
+  
+  if (/^\d{10}(\.\d+)?$/.test(uniqueid)) {
+    return uniqueid.split('.')[0];
+  }
+  
+  if (uniqueid.includes('-')) {
+    const parts = uniqueid.split('-');
+    if (parts.length === 5) {
+      try {
+        const timeLow = parts[0];
+        const timeMid = parts[1];
+        const timeHiAndVersion = parts[2];
+        const timeHi = timeHiAndVersion.substring(1); 
+        
+        const timestampHex = timeHi + timeMid + timeLow;
+        const timestamp = BigInt('0x' + timestampHex);
+        const unixTimestampMs = Number((timestamp - 122192928000000000n) / 10000n);
+        
+        return Math.floor(unixTimestampMs / 1000).toString();
+      } catch (e) {}
+    }
+  }
+  
+  return Math.floor(new Date(callData).getTime() / 1000).toString();
 }
