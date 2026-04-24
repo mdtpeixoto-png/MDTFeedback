@@ -10,7 +10,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import AlertsPage from "@/pages/AlertsPage";
 import { useFuncionarios, useLigacoes, type Ligacao } from "@/hooks/useFuncionarios";
 import { type AppUser } from "@/contexts/AuthContext";
-import { Users, Phone, BarChart3, TrendingUp, Search } from "lucide-react";
+import { Users, Phone, BarChart3, TrendingUp, Search, DollarSign } from "lucide-react";
 import { Link } from "react-router-dom";
 import LearningCurveChart from "@/components/dashboard/LearningCurveChart";
 import { getCurrentPeriodStart } from "@/lib/learning-curve";
@@ -216,7 +216,9 @@ function AdminCalls() {
   const [searchId, setSearchId] = useState("");
 
   const filteredLigacoes = ligacoes.filter(lig => 
-    !searchId || (lig.lead_id?.toLowerCase().includes(searchId.toLowerCase()))
+    (!searchId || (lig.lead_id?.toLowerCase().includes(searchId.toLowerCase()))) &&
+    lig.status === false &&
+    lig.resumo !== null
   );
 
   return (
@@ -291,6 +293,97 @@ function AdminCalls() {
   );
 }
 
+function AdminSales() {
+  const { data: ligacoes = [] } = useLigacoes();
+  const [searchId, setSearchId] = useState("");
+
+  const filteredSales = ligacoes.filter(lig => 
+    (!searchId || (lig.lead_id?.toLowerCase().includes(searchId.toLowerCase()))) &&
+    lig.status === true
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="glass-card px-5 py-4 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2 mr-auto">
+          <DollarSign className="h-4 w-4 text-success" />
+          <h3 className="text-sm font-semibold text-foreground">Vendas Realizadas</h3>
+          <span className="text-xs text-muted-foreground">{filteredSales.length} total</span>
+        </div>
+        
+        <div className="relative min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input 
+            type="text" 
+            placeholder="Buscar por ID..." 
+            className="w-full bg-secondary/50 border border-border rounded-md pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            value={searchId}
+            onChange={(e) => setSearchId(e.target.value)}
+          />
+        </div>
+      </div>
+      
+      {filteredSales.length === 0 && (
+        <div className="glass-card p-5 text-center text-sm text-muted-foreground">
+          {searchId ? "Nenhuma venda encontrada" : "Nenhuma venda registrada ainda"}
+        </div>
+      )}
+      {filteredSales.slice(0, 30).map(lig => {
+        const pontosBons = (lig.pontos_bons ?? "").split("\n").filter(Boolean);
+        const pontosRuins = (lig.pontos_ruins ?? "").split("\n").filter(Boolean);
+        const hasAnalysis = !!lig.resumo;
+
+        return (
+          <div key={lig.id} className="glass-card p-5 border-l-4 border-l-success">
+            <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">{lig.vendedor_nome ?? "Vendedor"}</span>
+                {lig.lead_id && <span className="text-[10px] font-mono text-muted-foreground uppercase">{lig.lead_id}</span>}
+              </div>
+              <div className="flex items-center flex-wrap gap-2">
+                {lig.operadora && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">{lig.operadora}</span>}
+                {lig.receita ? <span className="text-xs font-mono font-bold text-success">R$ {Number(lig.receita).toLocaleString('pt-BR')}</span> : null}
+                <span className="text-xs text-muted-foreground">{new Date(lig.created_at).toLocaleDateString('pt-BR')}</span>
+                {lig.url_audio && (
+                  <a href={lig.url_audio} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary hover:underline">🎧 Áudio</a>
+                )}
+              </div>
+            </div>
+            
+            {hasAnalysis ? (
+              <>
+                <p className="text-sm text-muted-foreground mb-3">{lig.resumo}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <h5 className="text-[11px] font-semibold text-success uppercase tracking-wider mb-1">Pontos Fortes</h5>
+                    <ul className="text-xs text-foreground space-y-0.5">
+                      {pontosBons.map((s, i) => <li key={i}>• {s}</li>)}
+                      {pontosBons.length === 0 && <li className="text-muted-foreground">—</li>}
+                    </ul>
+                  </div>
+                  <div>
+                    <h5 className="text-[11px] font-semibold text-warning uppercase tracking-wider mb-1">Pontos Fracos</h5>
+                    <ul className="text-xs text-foreground space-y-0.5">
+                      {pontosRuins.map((w, i) => <li key={i}>• {w}</li>)}
+                      {pontosRuins.length === 0 && <li className="text-muted-foreground">—</li>}
+                    </ul>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="mt-3 p-3 bg-secondary/30 rounded-md border border-border/50 flex items-center justify-center">
+                <span className="text-xs text-muted-foreground italic">
+                  Análise não disponível (áudio não encontrado no Asterisk ou em processamento)
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
   return (
     <Routes>
@@ -309,8 +402,13 @@ export default function AdminDashboard({ user, onLogout }: AdminDashboardProps) 
           <AdminSellerDetail />
         </DashboardLayout>
       } />
+      <Route path="sales" element={
+        <DashboardLayout user={user} onLogout={onLogout} title="Vendas" subtitle="Controle de vendas fechadas">
+          <AdminSales />
+        </DashboardLayout>
+      } />
       <Route path="calls" element={
-        <DashboardLayout user={user} onLogout={onLogout} title="Ligações" subtitle="Todas as ligações analisadas">
+        <DashboardLayout user={user} onLogout={onLogout} title="Ligações" subtitle="Ligações analisadas (não-vendas)">
           <AdminCalls />
         </DashboardLayout>
       } />

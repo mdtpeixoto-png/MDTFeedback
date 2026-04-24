@@ -4,7 +4,8 @@ import { Client } from "https://deno.land/x/mysql/mod.ts"
 
 const MYSQL_CONFIG = { hostname: "rs.gvctelecom.com.br", port: 3339, username: "kaua", password: "zgB4$WywCLfi", db: "asteriskcdrdb" };
 const GEMINI_API_KEY = "AIzaSyCQ-h57vkue0fSb2Q-INW2wzjK0E-WG040";
-const MAKESYSTEM_KEY = "5B89EC45-B32C-4A2F-BFC9-A027FCAEF771"; // Necessário para a API GraphQL
+const MAKESYSTEM_KEY = "5B89EC45-B32C-4A2F-BFC9-A027FCAEF771";
+const FAFALABS_TOKEN = "pp3lP4jqgzA8QLP6hw"; // Nova key para fafalabs
 
 // Cliente Supabase instanciado globalmente
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || "";
@@ -18,7 +19,7 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 serve(async (req) => {
   let mysqlClient;
   try {
-    console.info("--- Início Sincronização (v9 - Busca Otimizada por Vendedor) ---");
+    console.info("--- Início Sincronização (v10 - FafaLabs Operadora & Uniqueness) ---");
     mysqlClient = await new Client().connect(MYSQL_CONFIG);
     
     const { data: employees, error: empError } = await supabase.from('funcionarios').select('*');
@@ -30,7 +31,7 @@ serve(async (req) => {
       console.info(`\n>> Processando Vendedor: ${seller.nome_completo || seller.id}`);
 
       // ==========================================
-      // FLUXO A: Buscar a última venda no Make
+      // FLUXO A: Buscar a última venda no Make (GraphQL para buscar a venda, Fafa para os detalhes)
       // ==========================================
       try {
         const queryMake = JSON.stringify({
@@ -51,14 +52,9 @@ serve(async (req) => {
           const { data: existing } = await supabase.from('ligacoes').select('id').eq('lead_id', makeId).maybeSingle();
           
           if (!existing) {
-            console.info(`[Fluxo A] Nova venda encontrada no Make: ${makeId}. Buscando áudio e detalhes...`);
+            console.info(`[Fluxo A] Nova venda encontrada no Make: ${makeId}. Buscando áudio...`);
             
-            // Busca detalhes na FafaLabs para pegar a Operadora
-            const fafaDetails = await fetchMakeSaleFafa(makeId);
-            const operadoraName = fafaDetails?.operadora || makeSale.statusVenda?.nome || null;
-            const receitaFinal = isNaN(parseFloat(makeSale.valor)) ? (fafaDetails?.valor || 0) : parseFloat(makeSale.valor);
-            
-            // Busca o áudio no MySQL usando a coluna exata "sale" ou fallback para uniqueid
+            // Busca o áudio no MySQL
             const dbMatch = await mysqlClient.query(`
               SELECT * FROM history_permanent 
               WHERE (sale = '${makeId}' OR uniqueid LIKE '%${makeId.replace(`WEB${seller.id}u`, '')}%')
@@ -66,44 +62,53 @@ serve(async (req) => {
               ORDER BY data DESC LIMIT 1
             `);
 
+            // Busca detalhes precisos da FafaLabs (Operadora real: Claro, Vivo, etc)
+            const fafaDetails = await fetchMakeSaleFafa(makeId);
+            const operadoraFinal = fafaDetails?.operadora || makeSale.statusVenda?.nome || null;
+
             if (dbMatch && dbMatch.length > 0) {
               const call = dbMatch[0];
-              const rawText = extractTextFromTranscription(call.transcription);
-              const analysis = await analyzeWithGemini(rawText);
               
-              const insertObj = {
-                external_id: call.idhistory_permanent,
-                vendedor_id: seller.id,
-                vendedor_nome: seller.nome_completo,
-                lead_id: makeId,
-                pontos_bons: analysis.pontos_bons,
-                pontos_ruins: analysis.pontos_ruins,
-                resumo: analysis.resumo,
-                technical_quality: analysis.qualidade_tecnica,
-                score: (analysis.qualidade_tecnica * 10) + 20, // +20 pois é venda confirmada
-                status: true,
-                receita: receitaFinal,
-                operadora: operadoraName,
-                url_audio: formatAudioUrl(call.data, call.callurl),
-                created_at: new Date(call.data).toISOString()
-              };
-              
-              // Se já houver external_id duplicado, ele fará o fallback ou o Supabase rejeitará sem quebrar a function
-              const insertRes = await supabase.from('ligacoes').insert(insertObj);
-              if (insertRes && insertRes.error) console.error(`[Fluxo A] Erro ao salvar: ${insertRes.error.message}`);
-              else console.info(`[Fluxo A] ✅ Venda Completa salva com sucesso!`);
-              
-              await delay(4000); // Pausa segurança Gemini
+              // Verificação de segurança dupla (impede crash do ligacoes_external_id_key)
+              const { data: existingExt } = await supabase.from('ligacoes').select('id').eq('external_id', call.idhistory_permanent).maybeSingle();
+              if (existingExt) {
+                console.info(`[Fluxo A] O áudio desta venda já estava salvo em outra entrada no banco.`);
+              } else {
+                const rawText = extractTextFromTranscription(call.transcription);
+                const analysis = await analyzeWithGemini(rawText);
+                
+                const insertObj = {
+                  external_id: call.idhistory_permanent,
+                  vendedor_id: seller.id,
+                  vendedor_nome: seller.nome_completo,
+                  lead_id: makeId,
+                  pontos_bons: analysis.pontos_bons,
+                  pontos_ruins: analysis.pontos_ruins,
+                  resumo: analysis.resumo,
+                  technical_quality: Math.min(analysis.qualidade_tecnica, 9.99), // Prevenção de numeric overflow se a nota for > 9.99
+                  score: (Math.min(analysis.qualidade_tecnica, 9.99) * 10) + 20,
+                  status: true,
+                  receita: parseFloat(makeSale.valor || "0"),
+                  operadora: operadoraFinal,
+                  url_audio: formatAudioUrl(call.data, call.callurl),
+                  created_at: new Date(call.data).toISOString()
+                };
+                
+                const insertRes = await supabase.from('ligacoes').insert(insertObj);
+                if (insertRes && insertRes.error) console.error(`[Fluxo A] Erro ao salvar: ${insertRes.error.message}`);
+                else console.info(`[Fluxo A] ✅ Venda Completa salva com sucesso!`);
+                
+                await delay(4000); // Pausa segurança Gemini
+              }
             } else {
-              // Se não encontrou o áudio no MySQL, salva apenas a venda
               console.info(`[Fluxo A] Áudio não encontrado. Salvando apenas os dados da venda.`);
               const insertRes = await supabase.from('ligacoes').insert({
                 vendedor_id: seller.id,
                 vendedor_nome: seller.nome_completo,
                 lead_id: makeId,
                 status: true,
-                receita: receitaFinal,
-                operadora: operadoraName,
+                receita: parseFloat(makeSale.valor || "0"),
+                operadora: operadoraFinal,
                 created_at: makeSale.dataRegistro ? new Date(makeSale.dataRegistro).toISOString() : new Date().toISOString()
               });
               if (insertRes && insertRes.error) console.error(`[Fluxo A] Erro ao salvar venda parcial: ${insertRes.error.message}`);
@@ -128,25 +133,20 @@ serve(async (req) => {
 
         if (mysqlCall && mysqlCall.length > 0) {
           const call = mysqlCall[0];
-          // Utiliza a coluna 'sale' se existir, senão usa a matemática segura
           const callIdNum = extractTimestampFromUniqueid(String(call.uniqueid), call.data);
           const makeId = call.sale && String(call.sale).trim() !== "" ? call.sale : `WEB${call.idusuario}u${callIdNum}`;
 
-          const { data: existing } = await supabase.from('ligacoes').select('id').or(`lead_id.eq.${makeId},external_id.eq.${call.idhistory_permanent}`).maybeSingle();
+          // Verificação DUPLA (lead_id E external_id)
+          const { data: existingLead } = await supabase.from('ligacoes').select('id').eq('lead_id', makeId).maybeSingle();
+          const { data: existingExt } = await supabase.from('ligacoes').select('id').eq('external_id', call.idhistory_permanent).maybeSingle();
           
-          if (!existing) {
+          if (!existingLead && !existingExt) {
             console.info(`[Fluxo B] Nova ligação encontrada no MySQL: ${makeId}. Iniciando análise...`);
             
-            // Verifica se essa chamada específica resultou em venda diretamente via API
-            const saleData = await fetchMakeSaleGraphQL(makeId);
-            const fafaDetails = await fetchMakeSaleFafa(makeId);
-            const isSale = !!saleData || !!fafaDetails;
+            const saleData = await fetchMakeSaleFafa(makeId);
             
             const rawText = extractTextFromTranscription(call.transcription);
             const analysis = await analyzeWithGemini(rawText);
-            
-            let receitaFinal = saleData ? parseFloat(saleData.valor) : 0;
-            if (isNaN(receitaFinal) || receitaFinal === 0) receitaFinal = fafaDetails?.valor || 0;
             
             const insertObj = {
               external_id: call.idhistory_permanent,
@@ -156,11 +156,11 @@ serve(async (req) => {
               pontos_bons: analysis.pontos_bons,
               pontos_ruins: analysis.pontos_ruins,
               resumo: analysis.resumo,
-              technical_quality: analysis.qualidade_tecnica,
-              score: (analysis.qualidade_tecnica * 10) + (isSale ? 20 : 0),
-              status: isSale,
-              receita: receitaFinal,
-              operadora: fafaDetails?.operadora || saleData?.operadora || null,
+              technical_quality: Math.min(analysis.qualidade_tecnica, 9.99), // Prevenção de overflow
+              score: (Math.min(analysis.qualidade_tecnica, 9.99) * 10) + (saleData ? 20 : 0),
+              status: !!saleData,
+              receita: saleData?.valor || 0,
+              operadora: saleData?.operadora || null,
               url_audio: formatAudioUrl(call.data, call.callurl),
               created_at: new Date(call.data).toISOString()
             };
@@ -234,41 +234,20 @@ async function analyzeWithGemini(text: string) {
   }
 }
 
-// Opcional: Busca GraphQL para checar vendas individuais no Fluxo B
-async function fetchMakeSaleGraphQL(identificador: string) {
-  try {
-    const query = JSON.stringify({
-      query: `query { listar_vendas(identificador: "${identificador}", limite: 1) { valor statusVenda { nome } } }`
-    });
-    const res = await fetch('https://legacyapi.makesystem.com.br/sale/graphql', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'key': MAKESYSTEM_KEY },
-      body: query
-    });
-    const data = await res.json();
-    const sale = data?.data?.listar_vendas?.[0];
-    if (sale) {
-      return { valor: parseFloat(sale.valor || "0"), operadora: sale.statusVenda?.nome };
-    }
-  } catch (e) {
-    // Falha silenciosa permitida
-  }
-  return null;
-}
-
-// Busca na API FafaLabs para extrair operadora correta (tipo_item) e valor (valor_parcela)
+// NOVA FUNÇÃO: Busca diretamente da FafaLabs para extrair o tipo_item (Operadora)
 async function fetchMakeSaleFafa(identificador: string) {
   try {
-    const res = await fetch(`https://fafalabs.com.br/api/v1/make_sales.php?token=pp3lP4jqgzA8QLP6hw&id=${identificador}`);
+    const res = await fetch(`https://fafalabs.com.br/api/v1/make_sales.php?token=${FAFALABS_TOKEN}&id=${identificador}`);
     if (!res.ok) return null;
     const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-      const sale = data[0];
-      const parsedVal = parseFloat(sale.valor_parcela || "0");
-      return { operadora: sale.tipo_item || null, valor: isNaN(parsedVal) ? 0 : parsedVal };
+    
+    if (data && data.identificador) {
+      // Usa tipo_item (CLARO, VIVO, etc), ou cai no fallback para "produto"
+      const operadora = data.tipo_item || data.produto || data.operadora;
+      return { valor: parseFloat(data.valor || "0"), operadora: operadora };
     }
   } catch (e) {
-    // Falha silenciosa permitida
+    // Falha silenciosa
   }
   return null;
 }
