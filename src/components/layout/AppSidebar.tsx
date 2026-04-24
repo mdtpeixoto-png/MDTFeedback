@@ -2,7 +2,7 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, Phone, Settings,
-  LogOut, BarChart3, Notebook, Shield, Cog, AlertTriangle
+  LogOut, BarChart3, Notebook, Shield, Cog, AlertTriangle, TrendingUp
 } from "lucide-react";
 import { cn, formatName } from "@/lib/utils";
 
@@ -30,6 +30,7 @@ const roleMenus: Record<string, { label: string; path: string; icon: ReactNode }
     { label: "Dashboard", path: "/admin", icon: <LayoutDashboard className="h-4 w-4" /> },
     { label: "Vendedores", path: "/admin/sellers", icon: <Users className="h-4 w-4" /> },
     { label: "Ligações", path: "/admin/calls", icon: <Phone className="h-4 w-4" /> },
+    { label: "Vendas", path: "/admin/sales", icon: <TrendingUp className="h-4 w-4" /> },
     { label: "Alertas", path: "/admin/alerts", icon: <AlertTriangle className="h-4 w-4" /> },
     { label: "Configurações", path: "/admin/settings", icon: <Cog className="h-4 w-4" /> },
   ],

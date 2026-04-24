@@ -2,11 +2,11 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { Client } from "https://deno.land/x/mysql/mod.ts"
 
-const MYSQL_CONFIG = { hostname: "rs.gvctelecom.com.br", port: 3339, username: "kaua", password: "zgB4$WywCLfi", db: "asteriskcdrdb" };
+const MYSQL_CONFIG = { hostname: "rs.gvcatelecom.com.br", port: 3339, username: "kaua", password: "zgB4$WywCLfi", db: "asteriskcdrdb" };
 const GEMINI_API_KEY = "AIzaSyCQ-h57vkue0fSb2Q-INW2wzjK0E-WG040";
-const MAKESYSTEM_KEY = "5B89EC45-B32C-4A2F-BFC9-A027FCAEF771"; // Necessário para a API GraphQL
+const MAKESYSTEM_KEY = "5B89EC45-B32C-4A2F-BFC9-A027FCAEF771";
+const FAFAFA_TOKEN = "pp3lP4jqgzA8QLP6hw";
 
-// Cliente Supabase instanciado globalmente
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || "";
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || "";
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -18,7 +18,7 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 serve(async (req) => {
   let mysqlClient;
   try {
-    console.info("--- Início Sincronização (v9 - Busca Otimizada por Vendedor) ---");
+    console.info("--- Início Sincronização (v10 - Correções + Tabela Vendas) ---");
     mysqlClient = await new Client().connect(MYSQL_CONFIG);
     
     const { data: employees, error: empError } = await supabase.from('funcionarios').select('*');
@@ -48,17 +48,14 @@ serve(async (req) => {
 
         if (makeSale && makeSale.identificador) {
           const makeId = makeSale.identificador;
-          const { data: existing } = await supabase.from('ligacoes').select('id').eq('lead_id', makeId).maybeSingle();
           
-          if (!existing) {
-            console.info(`[Fluxo A] Nova venda encontrada no Make: ${makeId}. Buscando áudio e detalhes...`);
+          // Verifica duplicata em AMBAS as tabelas (ligacoes E vendas) pelo lead_id
+          const { data: existingLigacoes } = await supabase.from('ligacoes').select('id').eq('lead_id', makeId).maybeSingle();
+          const { data: existingVendas } = await supabase.from('vendas').select('id').eq('lead_id', makeId).maybeSingle();
+          
+          if (!existingLigacoes && !existingVendas) {
+            console.info(`[Fluxo A] Nova venda encontrada no Make: ${makeId}. Buscando áudio...`);
             
-            // Busca detalhes na FafaLabs para pegar a Operadora
-            const fafaDetails = await fetchMakeSaleFafa(makeId);
-            const operadoraName = fafaDetails?.operadora || makeSale.statusVenda?.nome || null;
-            const receitaFinal = isNaN(parseFloat(makeSale.valor)) ? (fafaDetails?.valor || 0) : parseFloat(makeSale.valor);
-            
-            // Busca o áudio no MySQL usando a coluna exata "sale" ou fallback para uniqueid
             const dbMatch = await mysqlClient.query(`
               SELECT * FROM history_permanent 
               WHERE (sale = '${makeId}' OR uniqueid LIKE '%${makeId.replace(`WEB${seller.id}u`, '')}%')
@@ -80,33 +77,35 @@ serve(async (req) => {
                 pontos_ruins: analysis.pontos_ruins,
                 resumo: analysis.resumo,
                 technical_quality: analysis.qualidade_tecnica,
-                score: (analysis.qualidade_tecnica * 10) + 20, // +20 pois é venda confirmada
+                score: Math.min((analysis.qualidade_tecnica * 10) + 20, 2147483647),
                 status: true,
-                receita: receitaFinal,
-                operadora: operadoraName,
+                receita: parseFloat(makeSale.valor || "0"),
+                operadora: makeSale.statusVenda?.nome || null,
                 url_audio: formatAudioUrl(call.data, call.callurl),
                 created_at: new Date(call.data).toISOString()
               };
               
-              // Se já houver external_id duplicado, ele fará o fallback ou o Supabase rejeitará sem quebrar a function
               const insertRes = await supabase.from('ligacoes').insert(insertObj);
-              if (insertRes && insertRes.error) console.error(`[Fluxo A] Erro ao salvar: ${insertRes.error.message}`);
-              else console.info(`[Fluxo A] ✅ Venda Completa salva com sucesso!`);
+              if (insertRes && insertRes.error) console.error(`[Fluxo A] Erro ao salvar em ligacoes: ${insertRes.error.message}`);
+              else console.info(`[Fluxo A] ✅ Venda completa salva em ligacoes!`);
               
-              await delay(4000); // Pausa segurança Gemini
+              await delay(4000);
             } else {
-              // Se não encontrou o áudio no MySQL, salva apenas a venda
-              console.info(`[Fluxo A] Áudio não encontrado. Salvando apenas os dados da venda.`);
-              const insertRes = await supabase.from('ligacoes').insert({
+              console.info(`[Fluxo A] Áudio não encontrado. Buscando operadora na fafalabs...`);
+              
+              const operadoraFafa = await fetchOperadoraFaFa(makeId);
+              
+              const insertRes = await supabase.from('vendas').insert({
                 vendedor_id: seller.id,
                 vendedor_nome: seller.nome_completo,
                 lead_id: makeId,
                 status: true,
-                receita: receitaFinal,
-                operadora: operadoraName,
+                receita: parseFloat(makeSale.valor || "0"),
+                operadora: makeSale.statusVenda?.nome || operadoraFaFa || null,
                 created_at: makeSale.dataRegistro ? new Date(makeSale.dataRegistro).toISOString() : new Date().toISOString()
               });
-              if (insertRes && insertRes.error) console.error(`[Fluxo A] Erro ao salvar venda parcial: ${insertRes.error.message}`);
+              if (insertRes && insertRes.error) console.error(`[Fluxo A] Erro ao salvar em vendas: ${insertRes.error.message}`);
+              else console.info(`[Fluxo A] ✅ Venda salva em vendas (sem análise)!`);
             }
           }
         }
@@ -128,25 +127,21 @@ serve(async (req) => {
 
         if (mysqlCall && mysqlCall.length > 0) {
           const call = mysqlCall[0];
-          // Utiliza a coluna 'sale' se existir, senão usa a matemática segura
           const callIdNum = extractTimestampFromUniqueid(String(call.uniqueid), call.data);
           const makeId = call.sale && String(call.sale).trim() !== "" ? call.sale : `WEB${call.idusuario}u${callIdNum}`;
+          const extId = call.idhistory_permanent;
 
-          const { data: existing } = await supabase.from('ligacoes').select('id').or(`lead_id.eq.${makeId},external_id.eq.${call.idhistory_permanent}`).maybeSingle();
+          // Verifica duplicata por lead_id E external_id em AMBAS as tabelas
+          const { data: existingLigacoes } = await supabase.from('ligacoes').select('id').eq('lead_id', makeId).eq('external_id', extId).maybeSingle();
+          const { data: existingVendas } = await supabase.from('vendas').select('id').eq('lead_id', makeId).eq('external_id', extId).maybeSingle();
           
-          if (!existing) {
+          if (!existingLigacoes && !existingVendas) {
             console.info(`[Fluxo B] Nova ligação encontrada no MySQL: ${makeId}. Iniciando análise...`);
             
-            // Verifica se essa chamada específica resultou em venda diretamente via API
             const saleData = await fetchMakeSaleGraphQL(makeId);
-            const fafaDetails = await fetchMakeSaleFafa(makeId);
-            const isSale = !!saleData || !!fafaDetails;
             
             const rawText = extractTextFromTranscription(call.transcription);
             const analysis = await analyzeWithGemini(rawText);
-            
-            let receitaFinal = saleData ? parseFloat(saleData.valor) : 0;
-            if (isNaN(receitaFinal) || receitaFinal === 0) receitaFinal = fafaDetails?.valor || 0;
             
             const insertObj = {
               external_id: call.idhistory_permanent,
@@ -157,10 +152,10 @@ serve(async (req) => {
               pontos_ruins: analysis.pontos_ruins,
               resumo: analysis.resumo,
               technical_quality: analysis.qualidade_tecnica,
-              score: (analysis.qualidade_tecnica * 10) + (isSale ? 20 : 0),
-              status: isSale,
-              receita: receitaFinal,
-              operadora: fafaDetails?.operadora || saleData?.operadora || null,
+              score: Math.min((analysis.qualidade_tecnica * 10) + (saleData ? 20 : 0), 2147483647),
+              status: !!saleData,
+              receita: saleData?.valor || 0,
+              operadora: saleData?.operadora || null,
               url_audio: formatAudioUrl(call.data, call.callurl),
               created_at: new Date(call.data).toISOString()
             };
@@ -169,7 +164,7 @@ serve(async (req) => {
             if (insertRes && insertRes.error) console.error(`[Fluxo B] Erro ao salvar: ${insertRes.error.message}`);
             else console.info(`[Fluxo B] ✅ Ligação salva com sucesso!`);
             
-            await delay(4000); // Pausa segurança Gemini
+            await delay(4000);
           }
         }
       } catch (e: any) {
@@ -234,7 +229,6 @@ async function analyzeWithGemini(text: string) {
   }
 }
 
-// Opcional: Busca GraphQL para checar vendas individuais no Fluxo B
 async function fetchMakeSaleGraphQL(identificador: string) {
   try {
     const query = JSON.stringify({
@@ -250,25 +244,22 @@ async function fetchMakeSaleGraphQL(identificador: string) {
     if (sale) {
       return { valor: parseFloat(sale.valor || "0"), operadora: sale.statusVenda?.nome };
     }
-  } catch (e) {
-    // Falha silenciosa permitida
-  }
+  } catch (e) {}
   return null;
 }
 
-// Busca na API FafaLabs para extrair operadora correta (tipo_item) e valor (valor_parcela)
-async function fetchMakeSaleFafa(identificador: string) {
+async function fetchOperadoraFaFa(identificador: string) {
   try {
-    const res = await fetch(`https://fafalabs.com.br/api/v1/make_sales.php?token=pp3lP4jqgzA8QLP6hw&id=${identificador}`);
-    if (!res.ok) return null;
+    const url = `https://fafalabs.com.br/api/v1/make_sales.php?token=${FAFAFA_TOKEN}&id=${identificador}`;
+    const res = await fetch(url);
     const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) {
-      const sale = data[0];
-      const parsedVal = parseFloat(sale.valor_parcela || "0");
-      return { operadora: sale.tipo_item || null, valor: isNaN(parsedVal) ? 0 : parsedVal };
+    
+    if (data && data.length > 0) {
+      const item = data.find((i: any) => i.tipo_item);
+      return item?.tipo_item || null;
     }
   } catch (e) {
-    // Falha silenciosa permitida
+    console.error("Erro fafalabs:", e);
   }
   return null;
 }
@@ -278,7 +269,7 @@ function formatAudioUrl(dateStr: string, callUrl: string) {
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  return `http://rs.gvctelecom.com.br:1079/gravacoes/${year}/${month}/${day}/${year}/${callUrl}`;
+  return `http://rs.gvcatelecom.com.br:1079/gravacoes/${year}/${month}/${day}/${year}/${callUrl}`;
 }
 
 function extractTimestampFromUniqueid(uniqueid: string, callData: string | Date): string {
