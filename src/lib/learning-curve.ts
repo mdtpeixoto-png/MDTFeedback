@@ -1,5 +1,5 @@
 
-import { startOfMonth, addDays, isWeekend, format, isAfter } from "date-fns";
+import { startOfMonth, addDays, isWeekend, format, isAfter, differenceInDays } from "date-fns";
 
 /**
  * Calculates the 5th business day of a given month.
@@ -62,4 +62,15 @@ export function calculateCallScore(ligacao: any): number {
   score -= weaknesses * 5;
   
   return Math.max(0, Math.min(100, score));
+}
+
+/**
+ * Calculates the learning efficiency ratio: (Cumulative Sales / Days Active)
+ * Returns a score from 0-100 where 2.0 sales/day is considered 100%.
+ */
+export function calculateEfficiencyRatio(totalSales: number, startDate: Date): number {
+  const days = Math.max(1, differenceInDays(new Date(), startDate) + 1);
+  const ratio = totalSales / days;
+  // If 2 sales per day is the target for 100 score
+  return Math.min(100, Math.round(ratio * 50)); 
 }

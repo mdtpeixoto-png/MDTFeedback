@@ -1,3 +1,4 @@
+import React, { useState, useMemo } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import MetricCard from "@/components/dashboard/MetricCard";
@@ -9,11 +10,11 @@ import SettingsPage from "@/pages/SettingsPage";
 import AlertsPage from "@/pages/AlertsPage";
 import { useFuncionarios, useLigacoes, type Ligacao } from "@/hooks/useFuncionarios";
 import { type AppUser } from "@/contexts/AuthContext";
-import { Users, Phone, BarChart3, TrendingUp } from "lucide-react";
+import { Users, Phone, BarChart3, TrendingUp, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 import LearningCurveChart from "@/components/dashboard/LearningCurveChart";
 import { getCurrentPeriodStart } from "@/lib/learning-curve";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 
 interface AdminDashboardProps {
   user: AppUser;
@@ -102,27 +103,37 @@ function AdminHome() {
     };
   });
 
-  // Prepare learning curve data (aggregated by day)
-  const learningData = allLigacoes
-    .slice()
-    .reverse()
-    .reduce((acc: any[], lig) => {
-      try {
-        if (!lig.created_at) return acc;
-        const date = format(new Date(lig.created_at), 'dd/MM');
-        const existing = acc.find(a => a.date === date);
-        const score = lig.score ?? 50;
-        if (existing) {
-          existing.score = (existing.score + score) / 2;
-        } else {
-          acc.push({ date, score });
-        }
-      } catch (e) {
-        console.error("Erro ao formatar data para o gráfico:", e);
+  // Prepare learning curve data (Cumulative Sales / Days Active)
+  const learningData = useMemo(() => {
+    if (allLigacoes.length === 0) return [];
+    
+    const sorted = [...allLigacoes].sort((a, b) => 
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    
+    const firstDate = new Date(sorted[0].created_at);
+    let cumulativeSales = 0;
+    const dailyData: Record<string, number> = {};
+    
+    sorted.forEach(lig => {
+      const d = format(new Date(lig.created_at), 'yyyy-MM-dd');
+      if (lig.status) {
+        dailyData[d] = (dailyData[d] || 0) + 1;
+      } else {
+        dailyData[d] = (dailyData[d] || 0);
       }
-      return acc;
-    }, [])
-    .slice(-15); // Last 15 days with data
+    });
+
+    const uniqueDays = Object.keys(dailyData).sort();
+    return uniqueDays.map(dayStr => {
+      cumulativeSales += dailyData[dayStr];
+      const dateObj = new Date(dayStr);
+      const daysElapsed = Math.max(1, differenceInDays(dateObj, firstDate) + 1);
+      // For the whole team, we scale differently. Let's say 10 sales/day is 100%
+      const score = Math.min(100, Math.round((cumulativeSales / daysElapsed) * 10));
+      return { date: format(dateObj, 'dd/MM'), score };
+    }).slice(-20); // Show last 20 days of progress
+  }, [allLigacoes]);
 
   return (
     <>
@@ -202,24 +213,48 @@ function AdminSellers() {
 
 function AdminCalls() {
   const { data: ligacoes = [] } = useLigacoes();
+  const [searchId, setSearchId] = useState("");
+
+  const filteredLigacoes = ligacoes.filter(lig => 
+    !searchId || (lig.lead_id?.toLowerCase().includes(searchId.toLowerCase()))
+  );
 
   return (
     <div className="space-y-3">
-      <div className="glass-card px-5 py-4 flex items-center gap-2">
-        <Phone className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold text-foreground">Feedbacks de Ligações</h3>
-        <span className="ml-auto text-xs text-muted-foreground">{ligacoes.length} total</span>
+      <div className="glass-card px-5 py-4 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2 mr-auto">
+          <Phone className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold text-foreground">Feedbacks de Ligações</h3>
+          <span className="text-xs text-muted-foreground">{ligacoes.length} total</span>
+        </div>
+        
+        <div className="relative min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input 
+            type="text" 
+            placeholder="Buscar por ID do Make (Ex: WEB...)" 
+            className="w-full bg-secondary/50 border border-border rounded-md pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            value={searchId}
+            onChange={(e) => setSearchId(e.target.value)}
+          />
+        </div>
       </div>
-      {ligacoes.length === 0 && (
-        <div className="glass-card p-5 text-center text-sm text-muted-foreground">Nenhuma ligação registrada ainda</div>
+      
+      {filteredLigacoes.length === 0 && (
+        <div className="glass-card p-5 text-center text-sm text-muted-foreground">
+          {searchId ? "Nenhuma ligação encontrada para este ID" : "Nenhuma ligação registrada ainda"}
+        </div>
       )}
-      {ligacoes.slice(0, 20).map(lig => {
+      {filteredLigacoes.slice(0, 20).map(lig => {
         const pontosBons = (lig.pontos_bons ?? "").split("\n").filter(Boolean);
         const pontosRuins = (lig.pontos_ruins ?? "").split("\n").filter(Boolean);
         return (
           <div key={lig.id} className="glass-card p-5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-foreground">{lig.vendedor_nome ?? "Vendedor"}</span>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">{lig.vendedor_nome ?? "Vendedor"}</span>
+                {lig.lead_id && <span className="text-[10px] font-mono text-muted-foreground uppercase">{lig.lead_id}</span>}
+              </div>
               <div className="flex items-center gap-2">
                 <span className={`text-xs px-2 py-0.5 rounded-full ${lig.status ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}>
                   {lig.status ? 'Venda' : 'Não vendeu'}
