@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import MetricCard from "@/components/dashboard/MetricCard";
 import { SalesBarChart } from "@/components/dashboard/Charts";
+import RankingTable from "@/components/dashboard/RankingTable";
 import NotebookSystem from "@/components/seller/NotebookSystem";
 import { useLigacoes, useFuncionarios, parsePoints } from "@/hooks/useFuncionarios";
 import { type AppUser } from "@/contexts/AuthContext";
@@ -25,13 +26,26 @@ function SellerOverview({ user }: { user: AppUser }) {
   
   // For learning curve, fetch all to see the progress
   const { data: allMyLigacoes = [] } = useLigacoes(myFunc?.id ?? "NOT_FOUND");
+  // For global ranking, fetch all (Requires RLS policy update in Supabase to work fully)
+  const { data: globalLigacoes = [] } = useLigacoes();
+
   const mySales = myLigacoes.filter(l => l.status);
   const totalValue = myLigacoes.reduce((sum, l) => sum + (l.receita ?? 0), 0);
+  const conversionRate = myLigacoes.length > 0 ? Math.round((mySales.length / myLigacoes.length) * 100) : 0;
 
-  // Ranking position - for now, we'll only show the user's own data 
-  // since RLS will prevent seeing others. 
-  // If a global ranking is needed, a separate view/API should be used.
-  const position = 0; // Simplified for now to avoid showing all data
+  // Global Ranking Calculation
+  const ranking = funcionarios.map(f => {
+    const sellerLigacoes = globalLigacoes.filter(l => l.vendedor_id === f.id);
+    return {
+      id: f.id,
+      name: f.nome_completo,
+      totalSales: sellerLigacoes.filter(l => l.status).length,
+      totalValue: sellerLigacoes.reduce((sum, l) => sum + (l.receita ?? 0), 0),
+    };
+  }).sort((a, b) => b.totalValue - a.totalValue);
+
+  const positionIndex = ranking.findIndex(r => r.id === myFunc?.id);
+  const position = positionIndex >= 0 ? positionIndex + 1 : 0;
 
   // By operadora
   const operadoras = [...new Set(myLigacoes.filter(l => l.operadora).map(l => l.operadora!))];
@@ -73,9 +87,10 @@ function SellerOverview({ user }: { user: AppUser }) {
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <MetricCard label="Minhas Vendas" value={mySales.length} icon={<TrendingUp className="h-5 w-5" />} />
         <MetricCard label="Receita Total" value={`R$ ${totalValue.toLocaleString('pt-BR')}`} icon={<BarChart3 className="h-5 w-5" />} />
+        <MetricCard label="Taxa Conversão" value={`${conversionRate}%`} icon={<Trophy className="h-5 w-5" />} />
         <MetricCard label="Posição Ranking" value={position > 0 ? `${position}º` : '—'} icon={<Trophy className="h-5 w-5" />} />
         <MetricCard label="Feedbacks" value={myLigacoes.length} icon={<Phone className="h-5 w-5" />} />
       </div>
@@ -143,7 +158,104 @@ function SellerOverview({ user }: { user: AppUser }) {
           })}
         </div>
       </div>
+
+      <div className="mt-6">
+        <RankingTable data={ranking} onSelect={() => {}} />
+      </div>
     </>
+  );
+}
+
+function SellerSales({ user }: { user: AppUser }) {
+  const { data: funcionarios = [] } = useFuncionarios();
+  const myFunc = funcionarios.find(f => f.email === user.email);
+  const { data: ligacoes = [] } = useLigacoes(myFunc?.id ?? "NOT_FOUND");
+  const [searchId, setSearchId] = useState("");
+
+  const filteredSales = ligacoes.filter(lig => 
+    (!searchId || (lig.lead_id?.toLowerCase().includes(searchId.toLowerCase()))) &&
+    lig.status === true
+  );
+
+  return (
+    <div className="space-y-3">
+      <div className="glass-card px-5 py-4 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2 mr-auto">
+          <TrendingUp className="h-4 w-4 text-success" />
+          <h3 className="text-sm font-semibold text-foreground">Minhas Vendas</h3>
+          <span className="text-xs text-muted-foreground">{filteredSales.length} total</span>
+        </div>
+        
+        <div className="relative min-w-[240px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <input 
+            type="text" 
+            placeholder="Buscar por ID..." 
+            className="w-full bg-secondary/50 border border-border rounded-md pl-9 pr-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+            value={searchId}
+            onChange={(e) => setSearchId(e.target.value)}
+          />
+        </div>
+      </div>
+      
+      {filteredSales.length === 0 && (
+        <div className="glass-card p-5 text-center text-sm text-muted-foreground">
+          {searchId ? "Nenhuma venda encontrada" : "Nenhuma venda registrada ainda"}
+        </div>
+      )}
+      {filteredSales.map(lig => {
+        const pontosBons = parsePoints(lig.pontos_bons);
+        const pontosRuins = parsePoints(lig.pontos_ruins);
+        const hasAnalysis = !!lig.resumo;
+
+        return (
+          <div key={lig.id} className="glass-card p-5 border-l-4 border-l-success">
+            <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-foreground">{lig.vendedor_nome ?? "Vendedor"}</span>
+                {lig.lead_id && <span className="text-[10px] font-mono text-muted-foreground uppercase">{lig.lead_id}</span>}
+              </div>
+              <div className="flex items-center flex-wrap gap-2">
+                {lig.operadora && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">{lig.operadora}</span>}
+                {lig.receita ? <span className="text-xs font-mono font-bold text-success">R$ {Number(lig.receita).toLocaleString('pt-BR')}</span> : null}
+                <span className="text-xs text-muted-foreground">{new Date(lig.created_at).toLocaleDateString('pt-BR')}</span>
+                {lig.url_audio && (
+                  <a href={lig.url_audio} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-primary hover:underline">🎧 Áudio</a>
+                )}
+              </div>
+            </div>
+            
+            {hasAnalysis ? (
+              <>
+                <p className="text-sm text-muted-foreground mb-3">{lig.resumo}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <h5 className="text-[11px] font-semibold text-success uppercase tracking-wider mb-1">Pontos Fortes</h5>
+                    <ul className="text-xs text-foreground space-y-0.5">
+                      {pontosBons.map((s, i) => <li key={i}>• {s}</li>)}
+                      {pontosBons.length === 0 && <li className="text-muted-foreground">—</li>}
+                    </ul>
+                  </div>
+                  <div>
+                    <h5 className="text-[11px] font-semibold text-warning uppercase tracking-wider mb-1">Pontos Fracos</h5>
+                    <ul className="text-xs text-foreground space-y-0.5">
+                      {pontosRuins.map((w, i) => <li key={i}>• {w}</li>)}
+                      {pontosRuins.length === 0 && <li className="text-muted-foreground">—</li>}
+                    </ul>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="mt-3 p-3 bg-secondary/30 rounded-md border border-border/50 flex items-center justify-center">
+                <span className="text-xs text-muted-foreground italic">
+                  Análise não disponível
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -236,6 +348,11 @@ export default function SellerDashboard({ user, onLogout }: SellerDashboardProps
       <Route index element={
         <DashboardLayout user={user} onLogout={onLogout} title="Meu Painel" subtitle="Visão geral do seu desempenho">
           <SellerOverview user={user} />
+        </DashboardLayout>
+      } />
+      <Route path="sales" element={
+        <DashboardLayout user={user} onLogout={onLogout} title="Minhas Vendas" subtitle="Controle das suas vendas fechadas">
+          <SellerSales user={user} />
         </DashboardLayout>
       } />
       <Route path="feedbacks" element={

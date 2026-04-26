@@ -36,6 +36,7 @@ const roleMenus: Record<string, { label: string; path: string; icon: ReactNode }
   ],
   seller: [
     { label: "Meu Painel", path: "/seller", icon: <LayoutDashboard className="h-4 w-4" /> },
+    { label: "Vendas", path: "/seller/sales", icon: <DollarSign className="h-4 w-4" /> },
     { label: "Feedbacks", path: "/seller/feedbacks", icon: <Phone className="h-4 w-4" /> },
     { label: "Anotações", path: "/seller/notes", icon: <Notebook className="h-4 w-4" /> },
     { label: "Configurações", path: "/seller/settings", icon: <Cog className="h-4 w-4" /> },
