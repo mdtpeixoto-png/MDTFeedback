@@ -56,7 +56,7 @@ function AdminHome() {
       totalSales: sellerLigacoes.filter(l => l.status).length,
       totalValue: sellerLigacoes.reduce((sum, l) => sum + (l.receita ?? 0), 0),
     };
-  }).sort((a, b) => b.totalSales - a.totalSales);
+  }).sort((a, b) => b.totalValue - a.totalValue);
 
   // By product (operadora)
   const operadoras = [...new Set(ligacoes.filter(l => l.operadora).map(l => l.operadora!))];
