@@ -36,9 +36,16 @@ async function fetchAppUser(supabaseUser: SupabaseUser): Promise<AppUser> {
     .eq("user_id", supabaseUser.id)
     .single();
 
+  // Try to find the user in the funcionarios table to get their true name
+  const { data: func } = await supabase
+    .from("funcionarios")
+    .select("nome_completo")
+    .eq("email", supabaseUser.email)
+    .maybeSingle();
+
   return {
     id: supabaseUser.id,
-    name: profile?.name ?? supabaseUser.email?.split("@")[0] ?? "Usuário",
+    name: func?.nome_completo ?? profile?.name ?? supabaseUser.user_metadata?.name ?? supabaseUser.email?.split("@")[0] ?? "Usuário",
     email: profile?.email ?? supabaseUser.email ?? "",
     role: (roleData?.role as AppUser["role"]) ?? null,
     avatar: profile?.avatar_url ?? undefined,
